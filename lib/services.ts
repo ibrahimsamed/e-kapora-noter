@@ -205,7 +205,13 @@ export async function requestPasswordReset(emailRaw: string): Promise<void> {
   });
   if (ins.error) throw new Error("password_resets yazılamadı");
   const link = `${appUrl()}/sifre-sifirla?token=${token}`;
-  await sendMail({ to: u.email as string, ...resetMail(u.name, link) });
+  try {
+    await sendMail({ to: u.email as string, ...resetMail(u.name, link) });
+  } catch (e) {
+    // Hata istemciye yansıtılmaz: yanıt farkı hesabın varlığını ele verirdi.
+    console.error("[mail] parola sıfırlama e-postası gönderilemedi:", (e as { code?: string }).code ?? (e as Error).message);
+    return;
+  }
   await mutate((d) => audit(d, { id: u.id, role: u.role }, "PASSWORD_RESET_REQUEST", u.id, "Parola sıfırlama bağlantısı gönderildi"));
 }
 

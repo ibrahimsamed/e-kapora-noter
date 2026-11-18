@@ -1,4 +1,6 @@
-/** E-posta gönderimi (Resend REST API). RESEND_API_KEY ve MAIL_FROM tanımlı olmalı. */
+import nodemailer from "nodemailer";
+
+/** E-posta gönderimi: kendi alan adınızın SMTP hesabı üzerinden. */
 
 export function appUrl(): string {
   const explicit = process.env.APP_URL?.trim();
@@ -9,21 +11,27 @@ export function appUrl(): string {
 }
 
 export async function sendMail(opts: { to: string; subject: string; html: string; text: string }): Promise<void> {
-  const key = process.env.RESEND_API_KEY;
-  const from = process.env.MAIL_FROM;
-  if (!key || !from) {
+  const host = process.env.SMTP_HOST;
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS?.replace(/\s+/g, ""); // Google uygulama parolası boşluklu gösterilir
+  const from = process.env.MAIL_FROM || user;
+  if (!host || !user || !pass || !from) {
     if (process.env.NODE_ENV !== "production") {
       console.log(`[mail:dev] To: ${opts.to}\nSubject: ${opts.subject}\n${opts.text}`);
       return;
     }
-    throw new Error("RESEND_API_KEY / MAIL_FROM tanımlı değil.");
+    throw new Error("SMTP_HOST / SMTP_USER / SMTP_PASS tanımlı değil.");
   }
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from, to: [opts.to], subject: opts.subject, html: opts.html, text: opts.text }),
+  const port = Number(process.env.SMTP_PORT ?? 465);
+  const transport = nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465, // 465: doğrudan TLS, 587: STARTTLS
+    auth: { user, pass },
+    connectionTimeout: 10_000,
+    socketTimeout: 15_000,
   });
-  if (!res.ok) throw new Error(`E-posta gönderilemedi (HTTP ${res.status}).`);
+  await transport.sendMail({ from, to: opts.to, subject: opts.subject, html: opts.html, text: opts.text });
 }
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] as string);
