@@ -7,7 +7,7 @@ import { PageHeader, Pill } from "@/components/ui";
 
 export default async function Page() {
   await requireRole("ADMIN");
-  const db = readDb();
+  const db = (await readDb());
   const rows = [...db.withdrawals].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map((w) => {
     const s = db.users.find((u) => u.id === w.sellerId);
     return {

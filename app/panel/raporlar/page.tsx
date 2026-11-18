@@ -7,7 +7,7 @@ import { Card, CardHeader, PageHeader } from "@/components/ui";
 
 export default async function Page() {
   const u = await requireRole("SELLER");
-  const st = sellerStats(readDb(), u.id);
+  const st = sellerStats((await readDb()), u.id);
   const rows = st.monthlyVolume.map((m, i) => ({ ay: m.name, hacim: m.hacim, komisyon: st.monthlyCommission[i].komisyon, kazanc: st.monthlyEarnings[i].kazanc }));
   const tl = (n: number) => formatTRY(Math.round(n * 100));
   return (

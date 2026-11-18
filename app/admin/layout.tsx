@@ -4,7 +4,7 @@ import { readDb } from "@/lib/queries";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const user = await requireRole("ADMIN");
-  const db = readDb();
+  const db = (await readDb());
   const nav: NavItem[] = [
     { href: "/admin", label: "Genel Bakış", icon: "dashboard", exact: true },
     { href: "/admin/kullanicilar", label: "Kullanıcı Yönetimi", icon: "users" },

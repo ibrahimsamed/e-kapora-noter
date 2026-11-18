@@ -7,7 +7,7 @@ import { Card, CardHeader, Empty, PageHeader, StatusBadge } from "@/components/u
 
 export default async function Page() {
   const u = await requireRole("SELLER");
-  const db = readDb();
+  const db = (await readDb());
   const rows = rowsFor(db, "SELLER", u.id).filter((r) => ["CANCELLATION_REQUESTED", "REFUND_PROCESSING", "REFUNDED"].includes(r.status));
   const reason = (id: string) => db.transactions.find((t) => t.id === id)?.cancelRequest?.reason ?? db.transactions.find((t) => t.id === id)?.refund?.reason ?? "—";
   return (

@@ -8,7 +8,7 @@ import { PageHeader, Stat } from "@/components/ui";
 
 export default async function Page() {
   await requireRole("ADMIN");
-  const db = readDb();
+  const db = (await readDb());
   const s = adminStats(db);
   const done = db.transactions.filter((t) => db.ledger.some((l) => l.txId === t.id && l.kind === "COMMISSION"));
   const buyer = done.reduce((a, t) => a + t.buyerFee, 0);

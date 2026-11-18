@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/ui";
 
 export default async function Page() {
   await requireRole("ADMIN");
-  const s = readDb().settings;
+  const s = (await readDb()).settings;
   return (
     <>
       <PageHeader title="Ayarlar" />

@@ -39,7 +39,7 @@ export async function currentUser(): Promise<User | null> {
   if (sig.length !== expected.length || !timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null;
   const [userId, exp] = payload.split(".");
   if (!exp || Number(exp) < Date.now()) return null;
-  const u = getDb().users.find((x) => x.id === userId);
+  const u = (await getDb()).users.find((x) => x.id === userId);
   return u && u.active ? u : null;
 }
 

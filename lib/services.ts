@@ -118,10 +118,10 @@ function isExpired(tx: Transaction) {
 
 /* ------------------------------------------------------------------ expiry */
 
-export function sweepExpired() {
-  const db = getDb();
+export async function sweepExpired() {
+  const db = await getDb();
   if (!db.transactions.some(isExpired)) return;
-  mutate((d) => {
+  await mutate((d) => {
     for (const tx of d.transactions) {
       if (isExpired(tx)) {
         tx.closeReason = "Geçerlilik süresi içinde ödeme yapılmadı.";
@@ -141,11 +141,11 @@ const registerSchema = z.object({
   password: z.string().min(8, "Parola en az 8 karakter olmalı").max(100),
 });
 
-export function registerSeller(input: unknown): User {
+export async function registerSeller(input: unknown): Promise<User> {
   const p = registerSchema.parse(input);
   const phone = normalizePhone(p.phone);
   if (!phone) fail("Geçerli bir cep telefonu girin (05xx xxx xx xx)");
-  return mutate((db) => {
+  return await mutate((db) => {
     if (db.users.some((u) => u.email === p.email)) fail("Bu e-posta ile kayıtlı bir hesap var.", 409);
     if (db.users.some((u) => u.phone === phone && u.role !== "CUSTOMER"))
       fail("Bu telefon numarası başka bir hesapta kayıtlı.", 409);
@@ -167,21 +167,21 @@ export function registerSeller(input: unknown): User {
   });
 }
 
-export function loginWithPassword(email: string, password: string): User {
-  const db = getDb();
+export async function loginWithPassword(email: string, password: string): Promise<User> {
+  const db = await getDb();
   const u = db.users.find((x) => x.email === email.trim().toLowerCase() && x.passwordHash);
   // zamanlama farkını azaltmak için her durumda hash karşılaştır
   const ok = bcrypt.compareSync(password, u?.passwordHash ?? "$2a$08$invalidinvalidinvalidinvalidinvalidinvalidinvalidinvalidinvalid");
   if (!u || !ok) fail("E-posta veya parola hatalı.", 401);
   if (!(u as User).active) fail("Hesabınız pasif durumda. Lütfen destek ile iletişime geçin.", 403);
-  mutate((d) => audit(d, { id: (u as User).id, role: (u as User).role }, "LOGIN", (u as User).id, "Giriş yapıldı"));
+  await mutate((d) => audit(d, { id: (u as User).id, role: (u as User).role }, "LOGIN", (u as User).id, "Giriş yapıldı"));
   return u as User;
 }
 
-export function requestOtp(phoneRaw: string, txId?: string): { phone: string; demoCode: string } {
+export async function requestOtp(phoneRaw: string, txId?: string): Promise<{ phone: string; demoCode: string }> {
   const phone = normalizePhone(phoneRaw);
   if (!phone) fail("Geçerli bir cep telefonu girin (05xx xxx xx xx)");
-  const db = getDb();
+  const db = await getDb();
   const cust = db.users.find((u) => u.phone === phone && u.role === "CUSTOMER");
   if (!cust) fail("Bu telefon numarası ile eşleşen bir işlem bulunamadı.", 404);
   if (txId) {
@@ -191,15 +191,15 @@ export function requestOtp(phoneRaw: string, txId?: string): { phone: string; de
   return { phone: phone as string, demoCode: DEMO_OTP };
 }
 
-export function verifyOtp(phoneRaw: string, code: string): User {
+export async function verifyOtp(phoneRaw: string, code: string): Promise<User> {
   const phone = normalizePhone(phoneRaw);
   if (!phone) fail("Geçersiz telefon");
   if (code.trim() !== DEMO_OTP) fail("Doğrulama kodu hatalı.", 401);
-  const db = getDb();
+  const db = await getDb();
   const cust = db.users.find((u) => u.phone === phone && u.role === "CUSTOMER");
   if (!cust) fail("Müşteri bulunamadı", 404);
   if (!(cust as User).active) fail("Hesabınız pasif durumda.", 403);
-  mutate((d) => audit(d, { id: (cust as User).id, role: "CUSTOMER" }, "LOGIN_OTP", (cust as User).id, "OTP ile erişim"));
+  await mutate((d) => audit(d, { id: (cust as User).id, role: "CUSTOMER" }, "LOGIN_OTP", (cust as User).id, "OTP ile erişim"));
   return cust as User;
 }
 
@@ -226,13 +226,13 @@ export function feeOf(deposit: number, bps: number) {
   return Math.round((deposit * bps) / 10000);
 }
 
-export function createTransaction(actor: Actor, input: unknown): { id: string } {
+export async function createTransaction(actor: Actor, input: unknown): Promise<{ id: string }> {
   if (actor.role !== "SELLER") fail("Yalnızca satıcılar işlem oluşturabilir.", 403);
   const p = createSchema.parse(input);
   const phone = normalizePhone(p.customerPhone);
   if (!phone) fail("Geçerli bir müşteri cep telefonu girin");
   if (p.deposit > p.totalAmount) fail("Kapora, toplam bedelden büyük olamaz.");
-  return mutate((db) => {
+  return await mutate((db) => {
     const seller = activeUser(db, actor);
     if (seller.phone === phone) fail("Kendi telefon numaranıza işlem oluşturamazsınız.");
     let cust = db.users.find((u) => u.phone === phone);
@@ -297,7 +297,7 @@ const cardSchema = z.object({
   }),
 });
 
-export function payTransaction(actor: Actor, input: unknown): { ok: boolean; message: string } {
+export async function payTransaction(actor: Actor, input: unknown): Promise<{ ok: boolean; message: string }> {
   if (actor.role !== "CUSTOMER") fail("Yalnızca müşteri ödeme yapabilir.", 403);
   const p = cardSchema.parse(input);
   const digits = p.card.number.replace(/\D/g, "");
@@ -310,7 +310,7 @@ export function payTransaction(actor: Actor, input: unknown): { ok: boolean; mes
   const expDate = new Date(2000 + +(m as RegExpExecArray)[2], +(m as RegExpExecArray)[1], 0, 23, 59);
   if (expDate < now()) fail("Kartın son kullanma tarihi geçmiş");
 
-  return mutate((db) => {
+  return await mutate((db) => {
     const tx = getTx(db, p.txId);
     assertAccess(tx, actor);
     activeUser(db, actor);
@@ -374,9 +374,9 @@ function refundBuyer(db: Db, tx: Transaction, actor: AnyActor, reason: string, l
   transition(db, tx, "REFUNDED", actor, label);
 }
 
-export function confirmTransaction(actor: Actor, txId: string) {
+export async function confirmTransaction(actor: Actor, txId: string) {
   if (actor.role !== "CUSTOMER" && actor.role !== "SELLER") fail("Yetkisiz işlem", 403);
-  return mutate((db) => {
+  return await mutate((db) => {
     const tx = getTx(db, txId);
     assertAccess(tx, actor);
     activeUser(db, actor);
@@ -395,8 +395,8 @@ export function confirmTransaction(actor: Actor, txId: string) {
   });
 }
 
-export function cancelUnpaid(actor: Actor, txId: string) {
-  return mutate((db) => {
+export async function cancelUnpaid(actor: Actor, txId: string) {
+  return await mutate((db) => {
     const tx = getTx(db, txId);
     assertAccess(tx, actor);
     if (tx.status !== "WAITING_FOR_PAYMENT") fail("Yalnızca ödeme bekleyen işlemler doğrudan iptal edilebilir.", 409);
@@ -406,9 +406,9 @@ export function cancelUnpaid(actor: Actor, txId: string) {
   });
 }
 
-export function requestCancel(actor: Actor, input: { txId: string; reason: string }) {
+export async function requestCancel(actor: Actor, input: { txId: string; reason: string }) {
   const reason = z.string().trim().min(5, "İptal gerekçesi en az 5 karakter olmalı").max(500).parse(input.reason);
-  return mutate((db) => {
+  return await mutate((db) => {
     const tx = getTx(db, input.txId);
     assertAccess(tx, actor);
     if (tx.status !== "SECURED" && tx.status !== "WAITING_FOR_CONFIRMATION")
@@ -425,9 +425,9 @@ export function requestCancel(actor: Actor, input: { txId: string; reason: strin
   });
 }
 
-export function respondCancel(actor: Actor, input: { txId: string; accept: boolean }) {
+export async function respondCancel(actor: Actor, input: { txId: string; accept: boolean }) {
   if (actor.role === "CUSTOMER") fail("Yetkisiz işlem", 403);
-  return mutate((db) => {
+  return await mutate((db) => {
     const tx = getTx(db, input.txId);
     assertAccess(tx, actor);
     if (tx.status !== "CANCELLATION_REQUESTED") fail("Bekleyen bir iptal talebi yok.", 409);
@@ -443,9 +443,9 @@ export function respondCancel(actor: Actor, input: { txId: string; accept: boole
   });
 }
 
-export function processRefund(actor: Actor, txId: string) {
+export async function processRefund(actor: Actor, txId: string) {
   if (actor.role === "CUSTOMER") fail("Yetkisiz işlem", 403);
-  return mutate((db) => {
+  return await mutate((db) => {
     const tx = getTx(db, txId);
     assertAccess(tx, actor);
     if (tx.status !== "REFUND_PROCESSING") fail("İade işlenebilecek durumda değil.", 409);
@@ -462,10 +462,10 @@ function evidenceSize(name: string) {
   return 120 + h;
 }
 
-export function openDispute(actor: Actor, input: { txId: string; reason: string; evidenceName?: string }) {
+export async function openDispute(actor: Actor, input: { txId: string; reason: string; evidenceName?: string }) {
   if (actor.role === "ADMIN") fail("Uyuşmazlığı taraflar açar.", 403);
   const reason = z.string().trim().min(10, "Gerekçe en az 10 karakter olmalı").max(1000).parse(input.reason);
-  return mutate((db) => {
+  return await mutate((db) => {
     const tx = getTx(db, input.txId);
     assertAccess(tx, actor);
     if (db.disputes.some((d) => d.txId === tx.id && d.status !== "RESOLVED")) fail("Bu işlemde zaten açık bir uyuşmazlık var.", 409);
@@ -493,10 +493,10 @@ export function openDispute(actor: Actor, input: { txId: string; reason: string;
   });
 }
 
-export function addDisputeStatement(actor: Actor, input: { disputeId: string; text: string; evidenceName?: string }) {
+export async function addDisputeStatement(actor: Actor, input: { disputeId: string; text: string; evidenceName?: string }) {
   if (actor.role === "ADMIN") fail("Yalnızca taraflar açıklama ekleyebilir.", 403);
   const text = z.string().trim().min(5, "Açıklama en az 5 karakter olmalı").max(1000).parse(input.text);
-  return mutate((db) => {
+  return await mutate((db) => {
     const d = db.disputes.find((x) => x.id === input.disputeId);
     if (!d) fail("Uyuşmazlık bulunamadı", 404);
     const dd = d as Db["disputes"][number];
@@ -515,13 +515,13 @@ export function addDisputeStatement(actor: Actor, input: { disputeId: string; te
   });
 }
 
-export function resolveDispute(
+export async function resolveDispute(
   actor: Actor,
   input: { disputeId: string; decision: "REFUND_BUYER" | "PAY_SELLER" | "MORE_REVIEW"; note: string },
 ) {
   if (actor.role !== "ADMIN") fail("Yalnızca admin uyuşmazlık sonuçlandırabilir.", 403);
   const note = z.string().trim().min(5, "Karar notu en az 5 karakter olmalı").max(1000).parse(input.note);
-  return mutate((db) => {
+  return await mutate((db) => {
     const d = db.disputes.find((x) => x.id === input.disputeId);
     if (!d) fail("Uyuşmazlık bulunamadı", 404);
     const dd = d as Db["disputes"][number];
@@ -547,7 +547,7 @@ export function resolveDispute(
 
 const ibanRe = /^TR\d{24}$/;
 
-export function requestWithdrawal(actor: Actor, input: { amount: number; bankName: string; iban: string }) {
+export async function requestWithdrawal(actor: Actor, input: { amount: number; bankName: string; iban: string }) {
   if (actor.role !== "SELLER") fail("Yetkisiz işlem", 403);
   const p = z
     .object({
@@ -558,7 +558,7 @@ export function requestWithdrawal(actor: Actor, input: { amount: number; bankNam
     .parse(input);
   const iban = p.iban.replace(/\s/g, "").toUpperCase();
   if (!ibanRe.test(iban)) fail("IBAN, TR ile başlayan 26 karakterli bir değer olmalı.");
-  return mutate((db) => {
+  return await mutate((db) => {
     const seller = activeUser(db, actor);
     if (p.amount < db.settings.minWithdrawal) fail(`Minimum çekim tutarı ${db.settings.minWithdrawal / 100} TL`);
     const bal = sellerBalances(db, seller.id);
@@ -579,9 +579,9 @@ export function requestWithdrawal(actor: Actor, input: { amount: number; bankNam
   });
 }
 
-export function decideWithdrawal(actor: Actor, input: { id: string; approve: boolean; note?: string }) {
+export async function decideWithdrawal(actor: Actor, input: { id: string; approve: boolean; note?: string }) {
   if (actor.role !== "ADMIN") fail("Yetkisiz işlem", 403);
-  return mutate((db) => {
+  return await mutate((db) => {
     const w = db.withdrawals.find((x) => x.id === input.id);
     if (!w) fail("Talep bulunamadı", 404);
     const ww = w as Db["withdrawals"][number];
@@ -602,9 +602,9 @@ export function decideWithdrawal(actor: Actor, input: { id: string; approve: boo
 
 /* ------------------------------------------------------------------ admin / profile */
 
-export function setUserActive(actor: Actor, input: { userId: string; active: boolean }) {
+export async function setUserActive(actor: Actor, input: { userId: string; active: boolean }) {
   if (actor.role !== "ADMIN") fail("Yetkisiz işlem", 403);
-  return mutate((db) => {
+  return await mutate((db) => {
     const u = db.users.find((x) => x.id === input.userId);
     if (!u) fail("Kullanıcı bulunamadı", 404);
     const uu = u as User;
@@ -615,7 +615,7 @@ export function setUserActive(actor: Actor, input: { userId: string; active: boo
   });
 }
 
-export function updateSettings(actor: Actor, input: { buyerFeeBps: number; sellerFeeBps: number; minWithdrawal: number }) {
+export async function updateSettings(actor: Actor, input: { buyerFeeBps: number; sellerFeeBps: number; minWithdrawal: number }) {
   if (actor.role !== "ADMIN") fail("Yetkisiz işlem", 403);
   const p = z
     .object({
@@ -624,14 +624,14 @@ export function updateSettings(actor: Actor, input: { buyerFeeBps: number; selle
       minWithdrawal: z.number().int().min(100).max(100_000_00),
     })
     .parse(input);
-  return mutate((db) => {
+  return await mutate((db) => {
     db.settings = p;
     audit(db, actor, "SETTINGS", "settings", JSON.stringify(p));
     return p;
   });
 }
 
-export function updateProfile(
+export async function updateProfile(
   actor: Actor,
   input: {
     name: string;
@@ -656,7 +656,7 @@ export function updateProfile(
     .parse(input);
   const iban = p.iban?.replace(/\s/g, "").toUpperCase();
   if (iban && !ibanRe.test(iban)) fail("IBAN, TR ile başlayan 26 karakterli bir değer olmalı.");
-  return mutate((db) => {
+  return await mutate((db) => {
     const u = activeUser(db, actor);
     if (p.email && db.users.some((x) => x.id !== u.id && x.email === p.email)) fail("Bu e-posta başka bir hesapta kayıtlı.", 409);
     u.name = p.name;

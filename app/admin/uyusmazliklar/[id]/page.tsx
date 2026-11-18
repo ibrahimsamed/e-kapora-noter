@@ -11,7 +11,7 @@ import { Card, CardHeader, KV, PageHeader, Pill, StatusBadge } from "@/component
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const admin = await requireRole("ADMIN");
-  const db = readDb();
+  const db = (await readDb());
   const d = db.disputes.find((x) => x.id === id);
   if (!d) notFound();
   const data = txDetail(db, d!.txId, "ADMIN", admin.id);

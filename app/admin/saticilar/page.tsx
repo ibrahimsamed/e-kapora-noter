@@ -8,7 +8,7 @@ import { PageHeader, Pill } from "@/components/ui";
 
 export default async function Page() {
   await requireRole("ADMIN");
-  const db = readDb();
+  const db = (await readDb());
   const rows = db.users.filter((u) => u.role === "SELLER").map((u) => {
     const b = sellerBalances(db, u.id);
     const mine = db.transactions.filter((t) => t.sellerId === u.id);

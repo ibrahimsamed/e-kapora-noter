@@ -7,7 +7,7 @@ export const metadata = { title: "Yeni İşlem — Satıcı Paneli" };
 
 export default async function Page() {
   await requireRole("SELLER");
-  const { settings } = readDb();
+  const { settings } = (await readDb());
   return (
     <>
       <PageHeader title="Yeni işlem oluştur" subtitle="Beş adımda güvenli kapora işlemi oluşturun ve müşterinize gönderin." />

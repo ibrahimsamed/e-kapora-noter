@@ -10,7 +10,7 @@ export const metadata = { title: "Genel Bakış — Yönetim" };
 
 export default async function Page() {
   await requireRole("ADMIN");
-  const db = readDb();
+  const db = (await readDb());
   const s = adminStats(db);
   const problems = verifyLedger(db);
   return (

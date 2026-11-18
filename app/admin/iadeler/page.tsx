@@ -8,7 +8,7 @@ import { PageHeader, StatusBadge } from "@/components/ui";
 
 export default async function Page() {
   await requireRole("ADMIN");
-  const db = readDb();
+  const db = (await readDb());
   const name = (id: string) => db.users.find((u) => u.id === id);
   const rows = db.transactions.filter((t) => ["CANCELLATION_REQUESTED", "REFUND_PROCESSING", "REFUNDED"].includes(t.status))
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))

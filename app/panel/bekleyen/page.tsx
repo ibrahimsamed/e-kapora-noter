@@ -8,7 +8,7 @@ export default async function Page() {
   return (
     <>
       <PageHeader title="Bekleyen ödemeler" subtitle="Müşterinin ödeme yapmasını bekleyen işlemler. Detaydan ID/bağlantıyı yeniden paylaşabilirsiniz." />
-      <TxTable rows={rowsFor(readDb(), "SELLER", u.id)} base="/panel/islemler" counterpart="customer" statuses={["WAITING_FOR_PAYMENT", "PAYMENT_PROCESSING"]} title="Ödeme bekleyenler" exportCsv={false} />
+      <TxTable rows={rowsFor((await readDb()), "SELLER", u.id)} base="/panel/islemler" counterpart="customer" statuses={["WAITING_FOR_PAYMENT", "PAYMENT_PROCESSING"]} title="Ödeme bekleyenler" exportCsv={false} />
     </>
   );
 }

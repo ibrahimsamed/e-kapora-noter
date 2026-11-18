@@ -22,7 +22,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ s
   const u = await requireRole("CUSTOMER");
   const { sekme } = await searchParams;
   const tab = TABS.find((t) => t.key === sekme) ?? TABS[0];
-  const db = readDb();
+  const db = (await readDb());
   const st = customerStats(db, u.id);
   const rows = rowsFor(db, "CUSTOMER", u.id);
   const count = (t: (typeof TABS)[number]) => (t.statuses ? rows.filter((r) => t.statuses!.includes(r.status)).length : rows.length);

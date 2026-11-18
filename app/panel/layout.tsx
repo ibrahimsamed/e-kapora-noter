@@ -4,7 +4,7 @@ import { readDb } from "@/lib/queries";
 
 export default async function SellerLayout({ children }: { children: React.ReactNode }) {
   const user = await requireRole("SELLER");
-  const db = readDb();
+  const db = (await readDb());
   const mine = db.transactions.filter((t) => t.sellerId === user.id);
   const nav: NavItem[] = [
     { href: "/panel", label: "Genel Bakış", icon: "dashboard", exact: true },

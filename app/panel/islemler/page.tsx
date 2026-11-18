@@ -10,7 +10,7 @@ export default async function Page() {
   return (
     <>
       <PageHeader title="Tüm işlemler" subtitle="Filtreleyin, arayın, detay görüntüleyin veya PDF/CSV alın." />
-      <TxTable rows={rowsFor(readDb(), "SELLER", u.id)} base="/panel/islemler" counterpart="customer" />
+      <TxTable rows={rowsFor((await readDb()), "SELLER", u.id)} base="/panel/islemler" counterpart="customer" />
     </>
   );
 }

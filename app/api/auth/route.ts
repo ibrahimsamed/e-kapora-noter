@@ -11,18 +11,18 @@ export async function POST(req: Request) {
     const p = payload ?? {};
     switch (action) {
       case "login": {
-        const u = S.loginWithPassword(String(p.email ?? ""), String(p.password ?? ""));
+        const u = await S.loginWithPassword(String(p.email ?? ""), String(p.password ?? ""));
         await createSession(u.id);
         return ok({ home: homeFor(u.role) });
       }
       case "register": {
-        const u = S.registerSeller(p);
+        const u = await S.registerSeller(p);
         await createSession(u.id);
         return ok({ home: homeFor(u.role) });
       }
-      case "otp.request": return ok(S.requestOtp(String(p.phone ?? ""), p.txId ? String(p.txId) : undefined));
+      case "otp.request": return ok(await S.requestOtp(String(p.phone ?? ""), p.txId ? String(p.txId) : undefined));
       case "otp.verify": {
-        const u = S.verifyOtp(String(p.phone ?? ""), String(p.code ?? ""));
+        const u = await S.verifyOtp(String(p.phone ?? ""), String(p.code ?? ""));
         await createSession(u.id);
         return ok({ home: homeFor(u.role) });
       }

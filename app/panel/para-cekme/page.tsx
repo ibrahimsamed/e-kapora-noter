@@ -10,7 +10,7 @@ const label = { PENDING: "Admin onayı bekliyor", APPROVED: "Onaylandı", REJECT
 
 export default async function Page() {
   const u = await requireRole("SELLER");
-  const db = readDb();
+  const db = (await readDb());
   const b = sellerBalances(db, u.id);
   const list = db.withdrawals.filter((w) => w.sellerId === u.id).sort((a, c) => c.createdAt.localeCompare(a.createdAt));
   return (

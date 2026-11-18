@@ -8,7 +8,7 @@ import { PageHeader, Pill } from "@/components/ui";
 
 export default async function Page() {
   await requireRole("ADMIN");
-  const db = readDb();
+  const db = (await readDb());
   const rows = [...db.disputes].sort((a, b) => b.openedAt.localeCompare(a.openedAt)).map((d) => {
     const tx = db.transactions.find((t) => t.id === d.txId)!;
     return {

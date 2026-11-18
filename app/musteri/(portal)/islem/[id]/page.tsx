@@ -9,7 +9,7 @@ import { TxActions } from "@/components/tx-actions";
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const u = await requireRole("CUSTOMER", `/musteri/islem/${id}`);
-  const data = txDetail(readDb(), id, "CUSTOMER", u.id);
+  const data = txDetail((await readDb()), id, "CUSTOMER", u.id);
   if (!data) notFound();
   return (
     <>

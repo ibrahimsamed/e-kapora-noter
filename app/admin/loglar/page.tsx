@@ -7,7 +7,7 @@ import { PageHeader, Pill } from "@/components/ui";
 
 export default async function Page() {
   await requireRole("ADMIN");
-  const db = readDb();
+  const db = (await readDb());
   const actions = [...new Set(db.audit.map((a) => a.action))].sort();
   const rows = [...db.audit].sort((a, b) => b.at.localeCompare(a.at)).slice(0, 600).map((a) => ({
     key: a.id, group: a.action, search: `${a.action} ${a.entityId} ${a.detail} ${db.users.find((u) => u.id === a.actorId)?.name ?? ""}`,

@@ -5,5 +5,5 @@ import { PageHeader } from "@/components/ui";
 
 export default async function Page() {
   const u = await requireRole("ADMIN");
-  return (<><PageHeader title="İşlemler" subtitle="Platformdaki tüm işlemler." /><TxTable rows={rowsFor(readDb(), "ADMIN", u.id)} base="/admin/islemler" counterpart="both" /></>);
+  return (<><PageHeader title="İşlemler" subtitle="Platformdaki tüm işlemler." /><TxTable rows={rowsFor((await readDb()), "ADMIN", u.id)} base="/admin/islemler" counterpart="both" /></>);
 }

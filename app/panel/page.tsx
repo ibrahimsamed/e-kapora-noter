@@ -11,7 +11,7 @@ export const metadata = { title: "Genel Bakış — Satıcı Paneli" };
 
 export default async function Page() {
   const user = await requireRole("SELLER");
-  const db = readDb();
+  const db = (await readDb());
   const st = sellerStats(db, user.id);
   const rows = rowsFor(db, "SELLER", user.id);
   return (

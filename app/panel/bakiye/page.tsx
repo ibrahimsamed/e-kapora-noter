@@ -8,7 +8,7 @@ import { Card, CardHeader, Empty, PageHeader, Stat, StatusBadge } from "@/compon
 
 export default async function Page() {
   const u = await requireRole("SELLER");
-  const db = readDb();
+  const db = (await readDb());
   const b = sellerBalances(db, u.id);
   const held = rowsFor(db, "SELLER", u.id).filter((r) => r.held > 0);
   return (

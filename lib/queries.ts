@@ -6,8 +6,8 @@ import { STATUS_META, ALL_STATUSES } from "./workflow";
 import type { Db, Dispute, LedgerEntry, Payment, Transaction, TxStatus, User } from "./types";
 
 /** Okuma girişi: süresi dolan işlemleri süpürür, sonra salt-okunur db döndürür. */
-export function readDb(): Db {
-  sweepExpired();
+export async function readDb(): Promise<Db> {
+  await sweepExpired();
   return getDb();
 }
 

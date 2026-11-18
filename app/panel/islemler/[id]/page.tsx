@@ -9,7 +9,7 @@ import { SharePanel, TxActions } from "@/components/tx-actions";
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const u = await requireRole("SELLER");
-  const data = txDetail(readDb(), id, "SELLER", u.id);
+  const data = txDetail((await readDb()), id, "SELLER", u.id);
   if (!data) notFound();
   return (
     <>

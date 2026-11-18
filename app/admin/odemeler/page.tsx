@@ -8,7 +8,7 @@ import { PageHeader, Pill } from "@/components/ui";
 
 export default async function Page() {
   await requireRole("ADMIN");
-  const db = readDb();
+  const db = (await readDb());
   const user = (id?: string) => db.users.find((u) => u.id === id);
   const rows = [
     ...db.ledger.filter((l) => l.txId).map((l) => ({

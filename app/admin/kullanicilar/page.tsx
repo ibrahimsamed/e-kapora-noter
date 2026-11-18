@@ -8,7 +8,7 @@ import { ROLE_LABEL } from "@/lib/workflow";
 
 export default async function Page() {
   await requireRole("ADMIN");
-  const db = readDb();
+  const db = (await readDb());
   const rows = db.users.map((u) => ({
     key: u.id,
     search: `${u.name} ${u.businessName ?? ""} ${u.email ?? ""} ${u.phone}`,
