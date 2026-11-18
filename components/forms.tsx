@@ -27,15 +27,15 @@ export function ProfileForm({ user }: { user: PublicUser }) {
       </Card>
       {seller && (
         <Card>
-          <CardHeader title="Demo banka bilgisi" subtitle="Yalnızca sahte/demo veri girin. Gerçek IBAN kullanmayın." />
+          <CardHeader title="Banka bilgisi" subtitle="Para çekimi için kullanılacak banka bilgileri." />
           <div className="grid gap-4 p-5 sm:grid-cols-2">
             <Field label="Banka"><Input value={f.bankName} onChange={(e) => setF({ ...f, bankName: e.target.value })} /></Field>
-            <Field label="Demo IBAN" hint="TR + 24 rakam"><Input value={f.iban} onChange={(e) => setF({ ...f, iban: e.target.value })} placeholder="TR000000000000000000000001" /></Field>
+            <Field label="IBAN" hint="TR + 24 rakam"><Input value={f.iban} onChange={(e) => setF({ ...f, iban: e.target.value })} placeholder="TR000000000000000000000001" /></Field>
           </div>
         </Card>
       )}
       <Card>
-        <CardHeader title="Bildirim ayarları" subtitle="DEMO: gerçek bildirim gönderilmez." />
+        <CardHeader title="Bildirim ayarları" subtitle="Bildirim tercihleriniz." />
         <div className="space-y-3 p-5">
           {([["sms", "SMS bildirimleri"], ["email", "E-posta bildirimleri"], ["whatsapp", "WhatsApp bildirimleri"]] as const).map(([k, l]) => (
             <label key={k} className="flex items-center justify-between rounded-xl border border-line px-4 py-3 text-sm">
@@ -53,7 +53,7 @@ export function ProfileForm({ user }: { user: PublicUser }) {
 export function WithdrawForm({ available, min, defaultBank, defaultIban }: { available: number; min: number; defaultBank: string; defaultIban: string }) {
   const { run, busy } = useAction();
   const [amount, setAmount] = useState("");
-  const [bank, setBank] = useState(defaultBank || "Demo Banka A.Ş.");
+  const [bank, setBank] = useState(defaultBank || "Banka A.Ş.");
   const [iban, setIban] = useState(defaultIban);
   const [err, setErr] = useState("");
   const kurus = tlToKurus(amount);
@@ -65,7 +65,6 @@ export function WithdrawForm({ available, min, defaultBank, defaultIban }: { ava
         const r = await run("withdrawal.request", { amount: kurus, bankName: bank, iban }, "Talep oluşturuldu; admin onayı bekleniyor.");
         if (r.ok) setAmount(""); else setErr(r.error ?? "");
       }}>
-        <div className="rounded-xl bg-amber-50 p-3 text-xs text-amber-900"><b>DEMO:</b> Gerçek banka transferi yapılmaz. Onaylanan talepler yalnızca simüle edilir.</div>
         <div className="flex items-center justify-between rounded-xl bg-success-soft p-4">
           <span className="text-sm text-success">Çekilebilir bakiye</span>
           <span className="text-xl font-bold text-success">{formatTRY(available)}</span>
@@ -76,12 +75,12 @@ export function WithdrawForm({ available, min, defaultBank, defaultIban }: { ava
             <Button type="button" variant="outline" onClick={() => setAmount(String(available / 100))}>Tümü</Button>
           </div>
         </Field>
-        <Field label="Demo banka hesabı">
+        <Field label="Banka">
           <Select value={bank} onChange={(e) => setBank(e.target.value)}>
-            {["Demo Banka A.Ş.", "Örnek Katılım Bankası", "Test Ticaret Bankası"].map((b) => <option key={b}>{b}</option>)}
+            {["Banka A.Ş.", "Örnek Katılım Bankası", "Test Ticaret Bankası"].map((b) => <option key={b}>{b}</option>)}
           </Select>
         </Field>
-        <Field label="IBAN (yalnızca sahte/demo veri)" hint="TR + 24 rakam"><Input value={iban} onChange={(e) => setIban(e.target.value)} placeholder="TR000000000000000000000001" required /></Field>
+        <Field label="IBAN" hint="TR + 24 rakam"><Input value={iban} onChange={(e) => setIban(e.target.value)} placeholder="TR000000000000000000000001" required /></Field>
         {err && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{err}</p>}
         <Button type="submit" disabled={busy || kurus <= 0 || kurus > available}><Banknote className="h-4 w-4" /> Para çekme talebi oluştur</Button>
         {kurus > available && <p className="text-xs text-red-600">Tutar çekilebilir bakiyeyi aşıyor.</p>}
@@ -100,7 +99,7 @@ export function RefundRowActions({ txId, status }: { txId: string; status: strin
       </div>
     );
   if (status === "REFUND_PROCESSING")
-    return <div className="flex justify-end"><Button size="sm" disabled={busy} onClick={() => run("tx.processRefund", { txId }, "İade tamamlandı (demo).")}>İadeyi tamamla</Button></div>;
+    return <div className="flex justify-end"><Button size="sm" disabled={busy} onClick={() => run("tx.processRefund", { txId }, "İade tamamlandı .")}>İadeyi tamamla</Button></div>;
   return null;
 }
 
@@ -115,12 +114,12 @@ export function WithdrawalDecision({ id }: { id: string }) {
         <Button size="sm" variant="outline" onClick={() => setOpen("reject")}>Reddet</Button>
       </div>
       <Modal open={!!open} onClose={() => setOpen(null)} title={open === "approve" ? "Çekim talebini onayla" : "Çekim talebini reddet"}>
-        <p className="mb-3 text-sm text-muted">{open === "approve" ? "Demo ödeme simüle edilecek; gerçek transfer yapılmaz." : "Tutar satıcının çekilebilir bakiyesine geri eklenecek."}</p>
+        <p className="mb-3 text-sm text-muted">{open === "approve" ? "Ödeme talebi onaylanacak." : "Tutar satıcının çekilebilir bakiyesine geri eklenecek."}</p>
         <Field label="Not (opsiyonel)"><Textarea value={note} onChange={(e) => setNote(e.target.value)} className="min-h-20" /></Field>
         <div className="mt-4 flex justify-end gap-2">
           <Button variant="outline" onClick={() => setOpen(null)}>Vazgeç</Button>
           <Button variant={open === "approve" ? "success" : "danger"} disabled={busy} onClick={async () => {
-            const r = await run("withdrawal.decide", { id, approve: open === "approve", note }, open === "approve" ? "Talep onaylandı (demo)." : "Talep reddedildi.");
+            const r = await run("withdrawal.decide", { id, approve: open === "approve", note }, open === "approve" ? "Talep onaylandı ." : "Talep reddedildi.");
             if (r.ok) { setOpen(null); setNote(""); }
           }}>{open === "approve" ? "Onayla" : "Reddet"}</Button>
         </div>

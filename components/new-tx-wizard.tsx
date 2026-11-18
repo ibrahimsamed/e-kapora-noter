@@ -108,7 +108,7 @@ export function NewTxWizard({ buyerFeeBps, sellerFeeBps }: { buyerFeeBps: number
           <div className="space-y-4">
             <h2 className="text-lg font-semibold text-navy">Müşteri bilgileri</h2>
             <Field label="Müşteri adı soyadı"><Input value={f.customerName} onChange={(e) => set("customerName", e.target.value)} /></Field>
-            <Field label="Telefon numarası" hint="Müşteri bu numara ile doğrulanır. Demo: 0555 000 00 01 …"><Input type="tel" value={f.customerPhone} onChange={(e) => set("customerPhone", e.target.value)} placeholder="0555 000 00 01" /></Field>
+            <Field label="Telefon numarası" hint="Müşteri bu numara ile doğrulanır."><Input type="tel" value={f.customerPhone} onChange={(e) => set("customerPhone", e.target.value)} placeholder="0555 000 00 01" /></Field>
             <Field label="E-posta (opsiyonel)"><Input type="email" value={f.customerEmail} onChange={(e) => set("customerEmail", e.target.value)} /></Field>
           </div>
         )}
@@ -182,7 +182,7 @@ export function NewTxWizard({ buyerFeeBps, sellerFeeBps }: { buyerFeeBps: number
             </div>
             <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-line p-4 text-sm">
               <input type="checkbox" className="mt-1 h-4 w-4" checked={f.accept} onChange={(e) => set("accept", e.target.checked)} />
-              <span>İşlem özetini ve yukarıdaki anlaşma koşullarını kontrol ettim; işlemin oluşturulmasını ve müşteriye gönderilmesini onaylıyorum. (DEMO: gerçek ödeme yapılmaz.)</span>
+              <span>İşlem özetini ve yukarıdaki anlaşma koşullarını kontrol ettim; işlemin oluşturulmasını ve müşteriye gönderilmesini onaylıyorum.</span>
             </label>
           </div>
         )}

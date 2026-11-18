@@ -2,7 +2,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Smartphone, Lock, FlaskConical } from "lucide-react";
+import { Smartphone, Lock } from "lucide-react";
 import { Button, Card, Field, Input, Logo, cn } from "./ui";
 import { postJson } from "./use-action";
 
@@ -26,11 +26,6 @@ function Frame({ title, subtitle, children, foot }: { title: string; subtitle: s
   );
 }
 
-const DEMO_ACCOUNTS = [
-  { label: "Satıcı: ABC Organizasyon", email: "abc-organizasyon@ekapora.demo", password: "Demo1234!" },
-  { label: "Satıcı: İstanbul Oto Galeri", email: "istanbul-oto-galeri@ekapora.demo", password: "Demo1234!" },
-  { label: "Admin", email: "admin@ekapora.demo", password: "Admin1234!" },
-];
 
 export function LoginForm() {
   const router = useRouter();
@@ -57,14 +52,6 @@ export function LoginForm() {
         {err && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{err}</p>}
         <Button type="submit" className="w-full" size="lg" disabled={busy}><Lock className="h-4 w-4" /> {busy ? "Giriş yapılıyor…" : "Giriş Yap"}</Button>
       </form>
-      <div className="mt-6 rounded-xl border border-dashed border-amber-300 bg-amber-50 p-3">
-        <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-amber-900"><FlaskConical className="h-3.5 w-3.5" /> Demo hesaplar (tıklayıp doldurun)</p>
-        <div className="flex flex-wrap gap-2">
-          {DEMO_ACCOUNTS.map((a) => (
-            <button key={a.email} type="button" onClick={() => { setEmail(a.email); setPassword(a.password); }} className="rounded-full border border-amber-300 bg-white px-3 py-1 text-xs font-medium text-amber-900 hover:bg-amber-100">{a.label}</button>
-          ))}
-        </div>
-      </div>
     </Frame>
   );
 }
@@ -86,7 +73,7 @@ export function RegisterForm() {
   }
 
   return (
-    <Frame title="Satıcı hesabı oluştur" subtitle="Ücretsiz DEMO hesabınızla güvenli işlem oluşturmaya başlayın." foot={<>Zaten hesabınız var mı? <Link href="/giris" className="font-semibold text-brand">Giriş yapın</Link></>}>
+    <Frame title="Satıcı hesabı oluştur" subtitle="Ücretsiz hesabınızla güvenli işlem oluşturmaya başlayın." foot={<>Zaten hesabınız var mı? <Link href="/giris" className="font-semibold text-brand">Giriş yapın</Link></>}>
       <form onSubmit={submit} className="space-y-4">
         <Field label="Ad soyad"><Input value={f.name} onChange={set("name")} required /></Field>
         <Field label="İşletme / marka adı"><Input value={f.businessName} onChange={set("businessName")} required /></Field>
@@ -95,7 +82,6 @@ export function RegisterForm() {
         <Field label="Parola" hint="En az 8 karakter"><Input type="password" autoComplete="new-password" value={f.password} onChange={set("password")} minLength={8} required /></Field>
         {err && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{err}</p>}
         <Button type="submit" className="w-full" size="lg" disabled={busy}>{busy ? "Oluşturuluyor…" : "Hesap Oluştur"}</Button>
-        <p className="text-xs text-muted">Bu bir DEMO sürümüdür; gerçek kimlik/ödeme bilgisi girmeyin.</p>
       </form>
     </Frame>
   );
@@ -138,11 +124,10 @@ export function CustomerLoginForm({ defaultTx = "" }: { defaultTx?: string }) {
           <Field label="Cep telefonu"><Input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="0555 000 00 01" required /></Field>
           {err && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{err}</p>}
           <Button type="submit" className="w-full" size="lg" disabled={busy}><Smartphone className="h-4 w-4" /> Doğrulama kodu gönder</Button>
-          <p className="rounded-xl bg-amber-50 p-3 text-xs text-amber-900">DEMO: Demo müşteri telefonları <b>0555 000 00 01</b> … <b>0555 000 00 25</b>. Gerçek SMS gönderilmez.</p>
         </form>
       ) : (
         <form onSubmit={verify} className="space-y-4">
-          <p className="rounded-xl bg-brand-soft p-3 text-sm text-navy">Mock OTP: gerçek SMS gönderilmedi. Demo kodunuz: <b className="font-mono tracking-widest">{demoCode}</b></p>
+          <p className="rounded-xl bg-brand-soft p-3 text-sm text-navy">Doğrulama kodunuz: <b className="font-mono tracking-widest">{demoCode}</b></p>
           <Field label="Doğrulama kodu"><Input inputMode="numeric" maxLength={6} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} autoFocus required /></Field>
           {err && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{err}</p>}
           <Button type="submit" className="w-full" size="lg" disabled={busy || code.length < 6}>{busy ? "Doğrulanıyor…" : "Doğrula ve devam et"}</Button>

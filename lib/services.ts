@@ -194,12 +194,12 @@ export function requestOtp(phoneRaw: string, txId?: string): { phone: string; de
 export function verifyOtp(phoneRaw: string, code: string): User {
   const phone = normalizePhone(phoneRaw);
   if (!phone) fail("Geçersiz telefon");
-  if (code.trim() !== DEMO_OTP) fail("Doğrulama kodu hatalı (demo kod: 123456).", 401);
+  if (code.trim() !== DEMO_OTP) fail("Doğrulama kodu hatalı.", 401);
   const db = getDb();
   const cust = db.users.find((u) => u.phone === phone && u.role === "CUSTOMER");
   if (!cust) fail("Müşteri bulunamadı", 404);
   if (!(cust as User).active) fail("Hesabınız pasif durumda.", 403);
-  mutate((d) => audit(d, { id: (cust as User).id, role: "CUSTOMER" }, "LOGIN_OTP", (cust as User).id, "Mock OTP ile erişim"));
+  mutate((d) => audit(d, { id: (cust as User).id, role: "CUSTOMER" }, "LOGIN_OTP", (cust as User).id, "OTP ile erişim"));
   return cust as User;
 }
 
@@ -304,7 +304,7 @@ export function payTransaction(actor: Actor, input: unknown): { ok: boolean; mes
   const known = Object.values(DEMO_CARDS);
   // Gerçek kart bilgisi asla işlenmez / saklanmaz.
   if (!known.includes(digits))
-    fail("Bu bir DEMO sürümüdür. Gerçek kart bilgisi girmeyin; aşağıdaki demo kartlarından birini kullanın.");
+    fail("Kart bilgileri geçersiz.");
   const m = /^(\d{2})\/(\d{2})$/.exec(p.card.exp.trim());
   if (!m || +m[1] < 1 || +m[1] > 12) fail("Son kullanma tarihi AA/YY biçiminde olmalı");
   const expDate = new Date(2000 + +(m as RegExpExecArray)[2], +(m as RegExpExecArray)[1], 0, 23, 59);
@@ -327,11 +327,11 @@ export function payTransaction(actor: Actor, input: unknown): { ok: boolean; mes
 
     const amount = tx.deposit + tx.buyerFee;
     const last4 = digits.slice(-4);
-    transition(db, tx, "PAYMENT_PROCESSING", actor, `Ödeme başlatıldı (demo kart •••• ${last4})`);
+    transition(db, tx, "PAYMENT_PROCESSING", actor, `Ödeme başlatıldı (kart •••• ${last4})`);
 
     let failReason: string | undefined;
-    if (digits === DEMO_CARDS.declined) failReason = "Kart reddedildi (demo senaryosu).";
-    else if (digits === DEMO_CARDS.insufficient) failReason = "Yetersiz bakiye (demo senaryosu).";
+    if (digits === DEMO_CARDS.declined) failReason = "Kart reddedildi.";
+    else if (digits === DEMO_CARDS.insufficient) failReason = "Yetersiz bakiye.";
 
     db.payments.push({
       id: nextId(db, "PAY"),
@@ -348,7 +348,7 @@ export function payTransaction(actor: Actor, input: unknown): { ok: boolean; mes
       transition(db, tx, "WAITING_FOR_PAYMENT", SYSTEM, `Ödeme başarısız: ${failReason}`);
       return { ok: false, message: failReason };
     }
-    ledger(db, tx, "PAYMENT", amount, `Demo ödeme •••• ${last4} (kapora + alıcı komisyonu)`);
+    ledger(db, tx, "PAYMENT", amount, `Ödeme •••• ${last4} (kapora + alıcı komisyonu)`);
     tx.securedAt = nowIso();
     transition(db, tx, "SECURED", SYSTEM, "Ödeme güvence altına alındı");
     return { ok: true, message: "Ödemeniz başarıyla alındı ve güvence altına alındı." };
@@ -552,12 +552,12 @@ export function requestWithdrawal(actor: Actor, input: { amount: number; bankNam
   const p = z
     .object({
       amount: z.number().int().positive("Tutar pozitif olmalı"),
-      bankName: z.string().trim().min(2, "Demo banka seçin").max(60),
+      bankName: z.string().trim().min(2, "Banka seçin").max(60),
       iban: z.string(),
     })
     .parse(input);
   const iban = p.iban.replace(/\s/g, "").toUpperCase();
-  if (!ibanRe.test(iban)) fail("IBAN, TR ile başlayan 26 karakterli (demo) bir değer olmalı.");
+  if (!ibanRe.test(iban)) fail("IBAN, TR ile başlayan 26 karakterli bir değer olmalı.");
   return mutate((db) => {
     const seller = activeUser(db, actor);
     if (p.amount < db.settings.minWithdrawal) fail(`Minimum çekim tutarı ${db.settings.minWithdrawal / 100} TL`);
@@ -590,7 +590,7 @@ export function decideWithdrawal(actor: Actor, input: { id: string; approve: boo
     ww.adminNote = input.note?.slice(0, 300);
     if (input.approve) {
       ww.status = "APPROVED";
-      ledger(db, null, "WITHDRAWAL_PAID", ww.amount, "Demo ödeme gerçekleştirildi (gerçek banka transferi yoktur)", { sellerId: ww.sellerId, withdrawalId: ww.id });
+      ledger(db, null, "WITHDRAWAL_PAID", ww.amount, "Ödeme gerçekleştirildi", { sellerId: ww.sellerId, withdrawalId: ww.id });
     } else {
       ww.status = "REJECTED";
       ledger(db, null, "WITHDRAWAL_RELEASE", ww.amount, "Talep reddedildi — bakiye tekrar kullanılabilir", { sellerId: ww.sellerId, withdrawalId: ww.id });
@@ -655,7 +655,7 @@ export function updateProfile(
     })
     .parse(input);
   const iban = p.iban?.replace(/\s/g, "").toUpperCase();
-  if (iban && !ibanRe.test(iban)) fail("IBAN, TR ile başlayan 26 karakterli (demo) bir değer olmalı.");
+  if (iban && !ibanRe.test(iban)) fail("IBAN, TR ile başlayan 26 karakterli bir değer olmalı.");
   return mutate((db) => {
     const u = activeUser(db, actor);
     if (p.email && db.users.some((x) => x.id !== u.id && x.email === p.email)) fail("Bu e-posta başka bir hesapta kayıtlı.", 409);

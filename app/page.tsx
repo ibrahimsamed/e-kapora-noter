@@ -1,14 +1,14 @@
 import Link from "next/link";
 import {
   ShieldCheck, FileCheck2, Lock, BadgeCheck, Scale, Wallet, FileText, Bell, Menu, ArrowRight, Car, Home, Hotel,
-  PartyPopper, ShoppingBag, Wrench, CheckCircle2, Clock, UserCheck, Search, ChevronDown, FlaskConical,
+  PartyPopper, ShoppingBag, Wrench, CheckCircle2, Clock, UserCheck, Search, ChevronDown,
 } from "lucide-react";
 import { Logo } from "@/components/ui";
 
 const steps = [
   { icon: FileCheck2, title: "Satıcı işlem oluşturur", text: "Satıcı; ürün veya hizmeti, kapora tutarını ve iptal/iade koşullarını dijital olarak kaydeder. Benzersiz bir işlem ID üretilir." },
   { icon: Search, title: "Müşteri işlem detaylarını kontrol eder", text: "Müşteri bağlantı veya işlem ID + telefon doğrulaması ile tüm koşulları, komisyonları ve satıcı bilgilerini görür." },
-  { icon: Lock, title: "Müşteri mock ödeme yapar", text: "Ödeme satıcıya değil güvenli havuza aktarılır ve işlem “Güvence Altında” durumuna geçer. (DEMO: sanal ödeme)" },
+  { icon: Lock, title: "Müşteri ödeme yapar", text: "Ödeme satıcıya değil güvenli havuza aktarılır ve işlem “Güvence Altında” durumuna geçer." },
   { icon: BadgeCheck, title: "Koşullar gerçekleşince sonuçlanır", text: "İki taraf da onayladığında tutar satıcıya aktarılır. Sorun olursa iptal/iade veya uyuşmazlık süreci devreye girer." },
 ];
 
@@ -27,24 +27,20 @@ const features = [
   { icon: FileText, t: "PDF işlem belgesi", d: "Koşullar, onay tarihleri ve ödeme hareketleri tek belgede." },
   { icon: Wallet, t: "Şeffaf komisyon", d: "Alıcı ve satıcı komisyonu ayrı ayrı, işlem öncesinde görünür." },
   { icon: Bell, t: "Anlık durum takibi", d: "Zaman çizelgesiyle ödemenin ve onayların her adımını izleyin." },
-  { icon: UserCheck, t: "Kayıt gerektirmeyen müşteri erişimi", d: "Müşteri telefon doğrulamasıyla (mock OTP) işlemine ulaşır." },
+  { icon: UserCheck, t: "Kayıt gerektirmeyen müşteri erişimi", d: "Müşteri telefon doğrulamasıyla (SMS doğrulama kodu) işlemine ulaşır." },
 ];
 
 const faqs = [
   { q: "e-kapora noter bir noter veya banka mıdır?", a: "Hayır. e-kapora noter; alıcı ve satıcı arasındaki kapora ödemeleri için dijital güvenli işlem altyapısı sunan bir platformdur. Noter veya finans kuruluşu olarak hareket etmez." },
-  { q: "Bu sürümde gerçek para hareketi var mı?", a: "Hayır. Bu bir DEMO sürümüdür. Tüm ödemeler, iadeler ve para çekimleri simülasyondur; gerçek kart bilgisi istenmez ve gerçek banka bağlantısı yoktur." },
-  { q: "Kaporam ne zaman satıcıya aktarılır?", a: "Alıcı ve satıcı işlemi ayrı ayrı onayladığında. Onaylardan biri eksikse tutar güvenli havuzda kalır." },
+    { q: "Kaporam ne zaman satıcıya aktarılır?", a: "Alıcı ve satıcı işlemi ayrı ayrı onayladığında. Onaylardan biri eksikse tutar güvenli havuzda kalır." },
   { q: "İptal edersem paramı geri alabilir miyim?", a: "İptal talebi satıcı tarafından onaylanırsa iade süreci başlar. Anlaşmazlık olursa uyuşmazlık bildirebilirsiniz; admin inceleyip karar verir." },
-  { q: "Komisyon ne kadar?", a: "Demo ayarlarda alıcıdan %2, satıcıdan %2 komisyon alınır. Tutarlar işlem oluşturulurken ve ödeme öncesinde ayrı ayrı gösterilir." },
-  { q: "Müşteri olarak hesap açmam gerekir mi?", a: "Hayır. Satıcının paylaştığı bağlantı veya işlem ID ile, telefon numaranıza gelen (demo) doğrulama koduyla işleminize erişirsiniz." },
+  { q: "Komisyon ne kadar?", a: "Alıcıdan %2, satıcıdan %2 komisyon alınır. Tutarlar işlem oluşturulurken ve ödeme öncesinde ayrı ayrı gösterilir." },
+  { q: "Müşteri olarak hesap açmam gerekir mi?", a: "Hayır. Satıcının paylaştığı bağlantı veya işlem ID ile, telefon numaranıza gelen doğrulama koduyla işleminize erişirsiniz." },
 ];
 
 export default function Landing() {
   return (
     <div className="bg-white">
-      <div className="bg-amber-100 px-3 py-1.5 text-center text-xs font-medium text-amber-900">
-        <FlaskConical className="mr-1.5 inline h-3.5 w-3.5" />DEMO SÜRÜMÜ — Gerçek para hareketi yoktur; tüm işlemler simülasyondur.
-      </div>
 
       <header className="sticky top-0 z-40 border-b border-line bg-white/90 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
@@ -111,7 +107,7 @@ export default function Landing() {
                 <li className="flex items-center justify-between"><span className="text-muted">Satıcı</span><span className="inline-flex items-center gap-1 font-semibold text-success"><CheckCircle2 className="h-4 w-4" />Onaylandı</span></li>
               </ul>
               <div className="mt-5 h-2 overflow-hidden rounded-full bg-surface"><div className="h-full w-2/3 rounded-full bg-success" /></div>
-              <p className="mt-3 text-center text-[11px] text-muted">Örnek kart • DEMO</p>
+              <p className="mt-3 text-center text-[11px] text-muted">Örnek kart</p>
             </div>
           </div>
         </div>
@@ -143,7 +139,7 @@ export default function Landing() {
             <p className="mt-3 text-muted">Kapora doğrudan satıcıya gitmez. İşlem sonuçlanana kadar güvenli havuzda tutulur; her hareket kayıt altına alınır.</p>
             <ul className="mt-6 space-y-4">
               {[
-                ["Ödeme önce güvence altına alınır", "Mock ödeme başarılı olduğunda işlem “Güvence Altında” durumuna geçer; ödeme olmadan güvence olmaz."],
+                ["Ödeme önce güvence altına alınır", "Ödeme başarılı olduğunda işlem “Güvence Altında” durumuna geçer; ödeme olmadan güvence olmaz."],
                 ["İki taraflı onay", "Müşteri ve satıcı onayları ayrı tutulur. İkisi de onaylamadan tutar aktarılmaz."],
                 ["İtirazda insan incelemesi", "Uyuşmazlık açıldığında otomatik karar verilmez; kanıtlar admin tarafından değerlendirilir."],
                 ["Tam izlenebilirlik", "Tüm durum değişiklikleri ve para hareketleri denetim kaydına ve finansal deftere işlenir."],
@@ -215,7 +211,7 @@ export default function Landing() {
       <section className="px-4 pb-20 sm:px-6">
         <div className="mx-auto max-w-5xl rounded-3xl bg-gradient-to-br from-navy to-brand p-10 text-center text-white sm:p-14">
           <h2 className="text-3xl font-bold tracking-tight">Kaporanı güvence altına almaya hazır mısın?</h2>
-          <p className="mx-auto mt-3 max-w-xl text-white/80">Demo hesabını dakikalar içinde oluştur, ilk güvenli işlemini hemen dene.</p>
+          <p className="mx-auto mt-3 max-w-xl text-white/80">Hesabını dakikalar içinde oluştur, ilk güvenli işlemini hemen dene.</p>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             <Link href="/kayit" className="rounded-xl bg-white px-6 py-3.5 font-semibold text-navy hover:bg-surface">Ücretsiz Hesap Oluştur</Link>
             <Link href="/musteri/giris" className="rounded-xl border border-white/40 px-6 py-3.5 font-semibold hover:bg-white/10">İşlemimi Sorgula</Link>
@@ -238,10 +234,10 @@ export default function Landing() {
             </ul>
           </div>
           <p className="text-xs text-muted">
-            e-kapora noter bir DEMO üründür. Noter veya finans kuruluşu değildir; gösterilen tüm ödemeler, iadeler ve para çekimleri simülasyondur. Gerçek kart veya banka bilgisi girmeyin.
+            e-kapora noter bir noter veya finans kuruluşu değildir.
           </p>
         </div>
-        <div className="border-t border-line py-4 text-center text-xs text-muted">© 2026 e-kapora noter — DEMO</div>
+        <div className="border-t border-line py-4 text-center text-xs text-muted">© 2026 e-kapora noter</div>
       </footer>
     </div>
   );

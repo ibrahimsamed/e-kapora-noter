@@ -6,7 +6,7 @@ import { WithdrawForm } from "@/components/forms";
 import { Card, CardHeader, Empty, PageHeader, Pill } from "@/components/ui";
 
 const tone = { PENDING: "amber", APPROVED: "green", REJECTED: "red" } as const;
-const label = { PENDING: "Admin onayı bekliyor", APPROVED: "Onaylandı (demo)", REJECTED: "Reddedildi" } as const;
+const label = { PENDING: "Admin onayı bekliyor", APPROVED: "Onaylandı", REJECTED: "Reddedildi" } as const;
 
 export default async function Page() {
   const u = await requireRole("SELLER");
@@ -15,7 +15,7 @@ export default async function Page() {
   const list = db.withdrawals.filter((w) => w.sellerId === u.id).sort((a, c) => c.createdAt.localeCompare(a.createdAt));
   return (
     <>
-      <PageHeader title="Para çekme" subtitle="Demo banka hesabına simüle edilmiş para çekme talebi oluşturun." />
+      <PageHeader title="Para çekme" subtitle="Banka hesabınıza para çekme talebi oluşturun." />
       <div className="grid gap-6 lg:grid-cols-2">
         <WithdrawForm available={b.available} min={db.settings.minWithdrawal} defaultBank={u.bankName ?? ""} defaultIban={u.iban ?? ""} />
         <Card>

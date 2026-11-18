@@ -1,7 +1,7 @@
 "use client";
 import clsx from "clsx";
 import { useEffect } from "react";
-import { X, ShieldCheck, FlaskConical } from "lucide-react";
+import { X, ShieldCheck } from "lucide-react";
 import { STATUS_META } from "@/lib/workflow";
 import type { TxStatus } from "@/lib/types";
 
@@ -151,10 +151,7 @@ export function PageHeader({ title, subtitle, action }: { title: string; subtitl
 
 export function DemoBanner() {
   return (
-    <div className="flex items-center justify-center gap-2 bg-amber-100 px-3 py-1.5 text-center text-xs font-medium text-amber-900">
-      <FlaskConical className="h-3.5 w-3.5 shrink-0" />
-      <span>DEMO SÜRÜMÜ — Tüm ödemeler, iadeler ve para çekimleri simülasyondur; gerçek para hareketi yoktur.</span>
-    </div>
+    null
   );
 }
 

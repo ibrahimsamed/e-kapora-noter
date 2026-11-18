@@ -38,10 +38,10 @@ export function SharePanel({ txId, customerName, title }: { txId: string; custom
   const copy = async (text: string, msg: string) => {
     try { await navigator.clipboard.writeText(text); toast("ok", msg); } catch { toast("err", "Kopyalanamadı; lütfen elle kopyalayın."); }
   };
-  const wa = `https://wa.me/?text=${encodeURIComponent(`Merhaba ${customerName}, "${title}" işlemi için güvenli ödeme bağlantınız (İşlem ID: ${txId}):\n${link}\n\n(e-kapora noter DEMO)`)}`;
+  const wa = `https://wa.me/?text=${encodeURIComponent(`Merhaba ${customerName}, "${title}" işlemi için güvenli ödeme bağlantınız (İşlem ID: ${txId}):\n${link}`)}`;
   return (
     <Card>
-      <CardHeader title="Müşteriye gönder" subtitle="Müşteri bu bağlantı veya işlem ID + telefon ile erişir (mock OTP)." />
+      <CardHeader title="Müşteriye gönder" subtitle="Müşteri bu bağlantı veya işlem ID + telefon ile erişir ." />
       <div className="space-y-3 p-5">
         <div className="flex items-center gap-2 rounded-xl bg-surface p-3">
           <span className="flex-1 font-mono text-sm font-semibold text-navy">{txId}</span>
@@ -70,7 +70,7 @@ function ReasonModal({ open, onClose, title, label, cta, danger, onSubmit, withE
       <div className="space-y-4">
         <Field label={label}><Textarea value={text} onChange={(e) => setText(e.target.value)} maxLength={500} /></Field>
         {withEvidence && (
-          <Field label="Kanıt dosyası (opsiyonel, demo)" hint="Dosya yüklenmez; yalnızca dosya adı kayda eklenir.">
+          <Field label="Kanıt dosyası (opsiyonel)" hint="Dosya yüklenmez; yalnızca dosya adı kayda eklenir.">
             <Input type="file" onChange={(e) => setEv(e.target.files?.[0]?.name ?? "")} />
           </Field>
         )}
@@ -105,7 +105,7 @@ function PayModal({ open, onClose, data }: { open: boolean; onClose: () => void;
   }
 
   return (
-    <Modal open={open} onClose={() => { setRes(null); onClose(); }} title="Güvenli Ödeme (DEMO)">
+    <Modal open={open} onClose={() => { setRes(null); onClose(); }} title="Güvenli Ödeme">
       {res?.ok ? (
         <div className="space-y-4 py-4 text-center">
           <CheckCircle2 className="mx-auto h-14 w-14 text-success" />
@@ -115,12 +115,9 @@ function PayModal({ open, onClose, data }: { open: boolean; onClose: () => void;
         </div>
       ) : (
         <form onSubmit={submit} className="space-y-4">
-          <div className="rounded-xl bg-amber-50 p-3 text-xs text-amber-900">
-            <b>DEMO:</b> Gerçek kart bilgisi girmeyin, hiçbir ödeme yapılmaz. Aşağıdaki demo kartlarını kullanın.
-          </div>
           <div className="flex flex-wrap gap-2">
             {DEMO_CARD_HINTS.map((c) => (
-              <button type="button" key={c.number} onClick={() => setF({ number: fmtNum(c.number), name: "DEMO MUSTERI", exp: "12/30", cvc: "123" })}
+              <button type="button" key={c.number} onClick={() => setF({ number: fmtNum(c.number), name: "MUSTERI", exp: "12/30", cvc: "123" })}
                 className="rounded-full border border-line px-3 py-1 text-xs font-medium hover:bg-surface">{c.label}</button>
             ))}
           </div>
@@ -186,7 +183,7 @@ export function TxActions({ data, role }: { data: TxDetailData; role: Role }) {
     );
   }
   if (role !== "CUSTOMER" && s === "REFUND_PROCESSING") {
-    buttons.push(<Button key="pr" disabled={busy} onClick={() => run("tx.processRefund", { txId: tx.id }, "İade tamamlandı (demo).")}><Send className="h-4 w-4" /> İadeyi tamamla ({formatTRY(data.held)})</Button>);
+    buttons.push(<Button key="pr" disabled={busy} onClick={() => run("tx.processRefund", { txId: tx.id }, "İade tamamlandı.")}><Send className="h-4 w-4" /> İadeyi tamamla ({formatTRY(data.held)})</Button>);
   }
   if (role !== "ADMIN" && s === "DISPUTED" && dispute && dispute.status !== "RESOLVED") {
     buttons.push(<Button key="st" variant="outline" onClick={() => setMode("statement")}><Gavel className="h-4 w-4" /> Açıklama / kanıt ekle</Button>);

@@ -46,14 +46,6 @@ export async function downloadTxPdf(d: TxDetailData) {
   doc.setFontSize(9);
   doc.text(tx.id, W - 36, 54, { align: "right" });
 
-  // demo uyarısı
-  doc.setFillColor(254, 243, 199);
-  doc.rect(0, 78, W, 26, "F");
-  doc.setTextColor(120, 53, 15);
-  doc.setFont("DejaVu", "bold");
-  doc.setFontSize(9);
-  doc.text("DEMO BELGESİ - GERÇEK ÖDEME DEKONTU VEYA FATURA DEĞİLDİR", W / 2, 95, { align: "center" });
-
   doc.setTextColor(37, 50, 71);
   doc.setFont("DejaVu", "bold");
   doc.setFontSize(14);
@@ -109,7 +101,7 @@ export async function downloadTxPdf(d: TxDetailData) {
     ["Müşteri onayı", formatDateTime(tx.buyerConfirmedAt), tx.buyerConfirmedAt ? "Onaylandı" : "Bekleniyor"],
     ["Güvence altına alma", formatDateTime(tx.securedAt), tx.securedAt ? "Ödeme güvence altına alındı" : "—"],
     ["Tamamlanma", formatDateTime(tx.completedAt), tx.completedAt ? "İşlem tamamlandı" : "—"],
-    ...payments.map((p) => ["Ödeme (demo kart •••• " + p.cardLast4 + ")", formatDateTime(p.at), `${formatTRY(p.amount)} — ${p.status === "SUCCESS" ? "Başarılı" : "Başarısız: " + (p.failReason ?? "")}`]),
+    ...payments.map((p) => ["Ödeme (kart •••• " + p.cardLast4 + ")", formatDateTime(p.at), `${formatTRY(p.amount)} — ${p.status === "SUCCESS" ? "Başarılı" : "Başarısız: " + (p.failReason ?? "")}`]),
     ...ledger.map((l) => [LEDGER_LABEL[l.kind] ?? l.kind, formatDateTime(l.at), formatTRY(l.amount)]),
   ], y + 6);
 
@@ -123,8 +115,8 @@ export async function downloadTxPdf(d: TxDetailData) {
     doc.setPage(i);
     const H = doc.internal.pageSize.getHeight();
     doc.setFont("DejaVu", "normal"); doc.setFontSize(7.5); doc.setTextColor(107, 122, 144);
-    doc.text(`Belge oluşturulma: ${formatDateTime(new Date().toISOString())}  •  e-kapora noter DEMO  •  Sayfa ${i}/${pages}`, W / 2, H - 20, { align: "center" });
-    doc.text("DEMO BELGESİ - GERÇEK ÖDEME DEKONTU VEYA FATURA DEĞİLDİR. e-kapora noter bir noter veya finans kuruluşu değildir.", W / 2, H - 10, { align: "center" });
+    doc.text(`Belge oluşturulma: ${formatDateTime(new Date().toISOString())}  •  e-kapora noter  •  Sayfa ${i}/${pages}`, W / 2, H - 20, { align: "center" });
+    doc.text("e-kapora noter bir noter veya finans kuruluşu değildir.", W / 2, H - 10, { align: "center" });
   }
   doc.save(`${tx.id}-islem-belgesi.pdf`);
 }

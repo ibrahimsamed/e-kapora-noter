@@ -26,7 +26,7 @@ export default async function Page() {
   ].sort((a, b) => b.at.localeCompare(a.at));
   return (
     <>
-      <PageHeader title="Ödemeler ve para hareketleri" subtitle="Finansal defterdeki (ledger) tüm demo hareketler." />
+      <PageHeader title="Ödemeler ve para hareketleri" subtitle="Finansal defterdeki (ledger) tüm hareketler." />
       <FilterTable title="Hareketler" minWidth={900} rows={rows} rightAlign={[5]} placeholder="İşlem ID, kişi, hareket"
         headers={["Tarih", "İşlem", "Hareket", "Müşteri", "Satıcı", "Tutar"]}
         groups={[...Object.entries(LEDGER_LABEL).filter(([k]) => !k.startsWith("WITHDRAWAL")).map(([value, label]) => ({ value, label })), { value: "FAILED", label: "Başarısız ödeme" }]} groupLabel="Tüm hareketler" />

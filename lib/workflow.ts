@@ -117,6 +117,6 @@ export const LEDGER_LABEL: Record<string, string> = {
   COMMISSION: "Platform komisyonu",
   REFUND: "Müşteriye iade",
   WITHDRAWAL_HOLD: "Çekim talebi (bloke)",
-  WITHDRAWAL_PAID: "Çekim ödemesi (demo)",
+  WITHDRAWAL_PAID: "Çekim ödemesi",
   WITHDRAWAL_RELEASE: "Çekim reddi (bakiye iadesi)",
 };

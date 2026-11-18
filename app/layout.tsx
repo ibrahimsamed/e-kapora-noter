@@ -8,7 +8,7 @@ const inter = Inter({ variable: "--font-inter", subsets: ["latin", "latin-ext"] 
 export const metadata: Metadata = {
   title: "e-kapora noter — Kaporan güvende, anlaşman kayıt altında",
   description:
-    "Alıcı ve satıcı arasındaki kapora ödemelerini güvence altına alan dijital güvenli işlem platformu. DEMO sürümü.",
+    "Alıcı ve satıcı arasındaki kapora ödemelerini güvence altına alan dijital güvenli işlem platformu.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

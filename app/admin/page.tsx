@@ -15,13 +15,13 @@ export default async function Page() {
   const problems = verifyLedger(db);
   return (
     <>
-      <PageHeader title="Platform genel bakış" subtitle="Tüm kullanıcı, işlem ve mock para akışlarının özeti." />
+      <PageHeader title="Platform genel bakış" subtitle="Tüm kullanıcı, işlem ve para akışlarının özeti." />
       <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <Stat label="Toplam Kullanıcı" value={formatNumber(s.users)} icon={<Users className="h-5 w-5" />} hint={`${s.customers} müşteri`} />
         <Stat label="Toplam Satıcı" value={formatNumber(s.sellers)} icon={<Store className="h-5 w-5" />} tone="navy" />
         <Stat label="Toplam İşlem" value={formatNumber(s.totalTx)} icon={<Activity className="h-5 w-5" />} />
         <Stat label="Toplam İşlem Hacmi" value={formatTRY(s.volume)} icon={<TrendingUp className="h-5 w-5" />} tone="navy" />
-        <Stat label="Güvence Altındaki Mock Para" value={formatTRY(s.secured)} icon={<Lock className="h-5 w-5" />} tone="success" />
+        <Stat label="Güvence Altındaki Tutar" value={formatTRY(s.secured)} icon={<Lock className="h-5 w-5" />} tone="success" />
         <Stat label="Platform Komisyon Geliri" value={formatTRY(s.commission)} icon={<Percent className="h-5 w-5" />} tone="success" />
         <Stat label="Bekleyen İade" value={formatNumber(s.pendingRefunds)} icon={<RotateCcw className="h-5 w-5" />} tone="amber" />
         <Stat label="Bekleyen Çekim Talebi" value={formatNumber(s.pendingWithdrawals)} icon={<Banknote className="h-5 w-5" />} tone="amber" />

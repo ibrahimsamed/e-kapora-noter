@@ -44,7 +44,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
             </div>
           </Card>
           <Card>
-            <CardHeader title="Yüklenen kanıtlar" subtitle="DEMO: dosya içeriği saklanmaz, yalnızca ad kaydedilir." />
+            <CardHeader title="Yüklenen kanıtlar" subtitle="Yalnızca dosya adı kaydedilir." />
             {dd.evidence.length === 0 ? <p className="p-5 text-sm text-muted">Kanıt yüklenmedi.</p> : (
               <ul className="divide-y divide-line px-5">{dd.evidence.map((e, i) => (
                 <li key={i} className="flex items-center gap-3 py-3 text-sm"><FileText className="h-4 w-4 text-muted" /><span className="flex-1">{e.name}</span><span className="text-xs text-muted">{e.sizeKb} KB • {ROLE_LABEL[e.by]} • {formatDateTime(e.at)}</span></li>
