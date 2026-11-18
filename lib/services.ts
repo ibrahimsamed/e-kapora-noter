@@ -1,6 +1,8 @@
 import bcrypt from "bcryptjs";
+import { createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
-import { mutate, getDb } from "./data";
+import { mutate, getDb, supabase } from "./data";
+import { appUrl, resetMail, sendMail } from "./mail";
 import { nowIso, now } from "./clock";
 import { canTransition, STATUS_META } from "./workflow";
 import { escrowHeld, sellerBalances } from "./balances";
@@ -176,6 +178,58 @@ export async function loginWithPassword(email: string, password: string): Promis
   if (!(u as User).active) fail("Hesabınız pasif durumda. Lütfen destek ile iletişime geçin.", 403);
   await mutate((d) => audit(d, { id: (u as User).id, role: (u as User).role }, "LOGIN", (u as User).id, "Giriş yapıldı"));
   return u as User;
+}
+
+const RESET_TTL_MS = 60 * 60 * 1000;
+const RESET_COOLDOWN_MS = 60 * 1000;
+const hashToken = (t: string) => createHash("sha256").update(t).digest("hex");
+
+/** Hesap var olsun ya da olmasın aynı şekilde döner (kullanıcı sayımı/numaralandırma engellenir). */
+export async function requestPasswordReset(emailRaw: string): Promise<void> {
+  const email = z.string().trim().toLowerCase().email().safeParse(emailRaw);
+  if (!email.success) return;
+  const db = await getDb();
+  const u = db.users.find((x) => x.email === email.data && x.passwordHash && x.active);
+  if (!u) return;
+  const sb = supabase();
+  const since = new Date(now().getTime() - RESET_COOLDOWN_MS).toISOString();
+  const recent = await sb.from("password_resets").select("id").eq("user_id", u.id).gt("created_at", since).limit(1);
+  if (recent.error) throw new Error("password_resets okunamadı");
+  if (recent.data.length) return; // dakikada en fazla 1 e-posta
+  const token = randomBytes(32).toString("base64url");
+  await sb.from("password_resets").delete().eq("user_id", u.id).is("used_at", null);
+  const ins = await sb.from("password_resets").insert({
+    user_id: u.id,
+    token_hash: hashToken(token),
+    expires_at: new Date(now().getTime() + RESET_TTL_MS).toISOString(),
+  });
+  if (ins.error) throw new Error("password_resets yazılamadı");
+  const link = `${appUrl()}/sifre-sifirla?token=${token}`;
+  await sendMail({ to: u.email as string, ...resetMail(u.name, link) });
+  await mutate((d) => audit(d, { id: u.id, role: u.role }, "PASSWORD_RESET_REQUEST", u.id, "Parola sıfırlama bağlantısı gönderildi"));
+}
+
+export async function resetPassword(token: string, password: string): Promise<void> {
+  const pw = z.string().min(8, "Parola en az 8 karakter olmalı").max(100).parse(password);
+  if (!token || token.length < 20) fail("Bağlantı geçersiz veya süresi dolmuş.", 400);
+  const sb = supabase();
+  // Tek kullanımlık: yalnızca bir istek jetonu "kullanıldı" olarak işaretleyebilir.
+  const claim = await sb
+    .from("password_resets")
+    .update({ used_at: new Date().toISOString() })
+    .eq("token_hash", hashToken(token))
+    .is("used_at", null)
+    .gt("expires_at", new Date().toISOString())
+    .select("user_id");
+  if (claim.error) throw new Error("password_resets güncellenemedi");
+  if (!claim.data.length) fail("Bağlantı geçersiz veya süresi dolmuş.", 400);
+  const userId = claim.data[0].user_id as string;
+  await mutate((d) => {
+    const u = d.users.find((x) => x.id === userId);
+    if (!u || !u.active) fail("Hesap bulunamadı veya pasif.", 400);
+    (u as User).passwordHash = bcrypt.hashSync(pw, 8);
+    audit(d, { id: userId, role: (u as User).role }, "PASSWORD_RESET", userId, "Parola sıfırlandı");
+  });
 }
 
 export async function requestOtp(phoneRaw: string, txId?: string): Promise<{ phone: string; demoCode: string }> {

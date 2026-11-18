@@ -52,6 +52,11 @@ function client(): SupabaseClient {
   return g.__ekSb;
 }
 
+/** Ham Supabase istemcisi (Db dışındaki tablolar, ör. password_resets, için). */
+export function supabase(): SupabaseClient {
+  return client();
+}
+
 /* ------------------------------------------------------------ satır dönüşümleri */
 
 const toSnake = (s: string) => s.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);

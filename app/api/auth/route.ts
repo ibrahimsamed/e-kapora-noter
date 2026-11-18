@@ -26,6 +26,14 @@ export async function POST(req: Request) {
         await createSession(u.id);
         return ok({ home: homeFor(u.role) });
       }
+      case "password.forgot": {
+        await S.requestPasswordReset(String(p.email ?? ""));
+        return ok(); // hesap var/yok bilgisi sızdırılmaz
+      }
+      case "password.reset": {
+        await S.resetPassword(String(p.token ?? ""), String(p.password ?? ""));
+        return ok();
+      }
       case "logout": {
         await destroySession();
         return ok();

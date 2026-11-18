@@ -49,6 +49,7 @@ export function LoginForm() {
       <form onSubmit={submit} className="space-y-4">
         <Field label="E-posta"><Input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required /></Field>
         <Field label="Parola"><Input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required /></Field>
+        <div className="-mt-1 text-right"><Link href="/sifremi-unuttum" className="text-sm font-semibold text-brand">Şifremi unuttum</Link></div>
         {err && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{err}</p>}
         <Button type="submit" className="w-full" size="lg" disabled={busy}><Lock className="h-4 w-4" /> {busy ? "Giriş yapılıyor…" : "Giriş Yap"}</Button>
       </form>
@@ -132,6 +133,74 @@ export function CustomerLoginForm({ defaultTx = "" }: { defaultTx?: string }) {
           {err && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{err}</p>}
           <Button type="submit" className="w-full" size="lg" disabled={busy || code.length < 6}>{busy ? "Doğrulanıyor…" : "Doğrula ve devam et"}</Button>
           <button type="button" className={cn("w-full text-sm text-muted hover:text-ink")} onClick={() => { setStep(1); setCode(""); setErr(""); }}>← Numarayı değiştir</button>
+        </form>
+      )}
+    </Frame>
+  );
+}
+
+export function ForgotPasswordForm() {
+  const [email, setEmail] = useState("");
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true); setErr("");
+    const r = await postJson("/api/auth", { action: "password.forgot", payload: { email } });
+    setBusy(false);
+    if (!r.ok) { setErr(r.error ?? "İstek gönderilemedi"); return; }
+    setSent(true);
+  }
+
+  return (
+    <Frame title="Şifremi unuttum" subtitle="Hesabınızın e-posta adresini girin, parola sıfırlama bağlantısı gönderelim." foot={<Link href="/giris" className="font-semibold text-brand">Girişe dön</Link>}>
+      {sent ? (
+        <p role="status" className="rounded-xl bg-brand-soft p-4 text-sm text-navy">
+          Bu e-posta ile kayıtlı bir hesap varsa, parola sıfırlama bağlantısı gönderildi. Bağlantı 1 saat geçerlidir. Gelen kutunuzu ve spam klasörünü kontrol edin.
+        </p>
+      ) : (
+        <form onSubmit={submit} className="space-y-4">
+          <Field label="E-posta"><Input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></Field>
+          {err && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{err}</p>}
+          <Button type="submit" className="w-full" size="lg" disabled={busy}>{busy ? "Gönderiliyor…" : "Sıfırlama bağlantısı gönder"}</Button>
+        </form>
+      )}
+    </Frame>
+  );
+}
+
+export function ResetPasswordForm({ token }: { token: string }) {
+  const router = useRouter();
+  const [password, setPassword] = useState("");
+  const [again, setAgain] = useState("");
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setErr("");
+    if (password !== again) { setErr("Parolalar eşleşmiyor."); return; }
+    setBusy(true);
+    const r = await postJson("/api/auth", { action: "password.reset", payload: { token, password } });
+    setBusy(false);
+    if (!r.ok) { setErr(r.error ?? "Parola değiştirilemedi"); return; }
+    setDone(true);
+    setTimeout(() => router.push("/giris"), 2000);
+  }
+
+  return (
+    <Frame title="Yeni parola belirle" subtitle="En az 8 karakterli yeni bir parola girin." foot={<Link href="/giris" className="font-semibold text-brand">Girişe dön</Link>}>
+      {done ? (
+        <p role="status" className="rounded-xl bg-brand-soft p-4 text-sm text-navy">Parolanız değiştirildi. Giriş sayfasına yönlendiriliyorsunuz…</p>
+      ) : (
+        <form onSubmit={submit} className="space-y-4">
+          <Field label="Yeni parola"><Input type="password" autoComplete="new-password" minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} required /></Field>
+          <Field label="Yeni parola (tekrar)"><Input type="password" autoComplete="new-password" minLength={8} value={again} onChange={(e) => setAgain(e.target.value)} required /></Field>
+          {err && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{err}</p>}
+          <Button type="submit" className="w-full" size="lg" disabled={busy}><Lock className="h-4 w-4" /> {busy ? "Kaydediliyor…" : "Parolayı değiştir"}</Button>
         </form>
       )}
     </Frame>
