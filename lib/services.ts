@@ -405,8 +405,8 @@ export async function createTransaction(actor: Actor, input: unknown): Promise<{
   return await mutate((db) => {
     const seller = activeUser(db, actor);
     if (seller.phone === phone) fail("Kendi telefon numaranıza işlem oluşturamazsınız.");
-    let cust = db.users.find((u) => u.phone === phone);
-    if (cust && cust.role !== "CUSTOMER") fail("Bu telefon numarası bir satıcı/yönetici hesabına ait.");
+    // Satıcı/yönetici hesabı olan bir numara da müşteri olabilir: müşteri kaydı ayrı bir (CUSTOMER) hesaptır.
+    let cust = db.users.find((u) => u.phone === phone && u.role === "CUSTOMER");
     if (!cust) {
       cust = {
         id: nextId(db, "USR"),
@@ -459,6 +459,7 @@ export async function createTransaction(actor: Actor, input: unknown): Promise<{
 const cardSchema = z.object({
   txId: z.string(),
   idemKey: z.string().min(6).max(80),
+  termsAccepted: z.literal(true, { message: "Ödeme için şartlar ve koşulları kabul etmelisiniz." }),
   card: z.object({
     number: z.string(),
     name: z.string().trim().min(3, "Kart üzerindeki isim gerekli"),

@@ -7,7 +7,7 @@ import { Logo } from "@/components/ui";
 
 const steps = [
   { icon: FileCheck2, title: "Satıcı işlem oluşturur", text: "Satıcı; ürün veya hizmeti, kapora tutarını ve iptal/iade koşullarını dijital olarak kaydeder. Benzersiz bir işlem ID üretilir." },
-  { icon: Search, title: "Müşteri işlem detaylarını kontrol eder", text: "Müşteri bağlantı veya işlem ID + telefon doğrulaması ile tüm koşulları, komisyonları ve satıcı bilgilerini görür." },
+  { icon: Search, title: "Müşteri işlem detaylarını kontrol eder", text: "Müşteri bağlantı veya işlem ID + telefon doğrulaması ile tüm koşulları ve satıcı bilgilerini görür." },
   { icon: Lock, title: "Müşteri ödeme yapar", text: "Ödeme satıcıya değil güvenli havuza aktarılır ve işlem “Güvence Altında” durumuna geçer." },
   { icon: BadgeCheck, title: "Koşullar gerçekleşince sonuçlanır", text: "İki taraf da onayladığında tutar satıcıya aktarılır. Sorun olursa iptal/iade veya uyuşmazlık süreci devreye girer." },
 ];
@@ -25,7 +25,7 @@ const features = [
   { icon: ShieldCheck, t: "Güvenli havuz (escrow) mantığı", d: "Kapora, işlem sonuçlanana kadar satıcıya aktarılmaz." },
   { icon: Scale, t: "Uyuşmazlık yönetimi", d: "İtiraz halinde otomatik sonuçlandırma yok; kanıtlar admin tarafından incelenir." },
   { icon: FileText, t: "PDF işlem belgesi", d: "Koşullar, onay tarihleri ve ödeme hareketleri tek belgede." },
-  { icon: Wallet, t: "Şeffaf komisyon", d: "Alıcı ve satıcı komisyonu ayrı ayrı, işlem öncesinde görünür." },
+  { icon: Wallet, t: "Net koşullar", d: "İptal, iade ve teslimat koşulları işlem öncesinde iki tarafa da açıkça gösterilir." },
   { icon: Bell, t: "Anlık durum takibi", d: "Zaman çizelgesiyle ödemenin ve onayların her adımını izleyin." },
   { icon: UserCheck, t: "Kayıt gerektirmeyen müşteri erişimi", d: "Müşteri telefon doğrulamasıyla (SMS doğrulama kodu) işlemine ulaşır." },
 ];
@@ -34,7 +34,6 @@ const faqs = [
   { q: "e-kapora noter bir noter veya banka mıdır?", a: "Hayır. e-kapora noter; alıcı ve satıcı arasındaki kapora ödemeleri için dijital güvenli işlem altyapısı sunan bir platformdur. Noter veya finans kuruluşu olarak hareket etmez." },
     { q: "Kaporam ne zaman satıcıya aktarılır?", a: "Alıcı ve satıcı işlemi ayrı ayrı onayladığında. Onaylardan biri eksikse tutar güvenli havuzda kalır." },
   { q: "İptal edersem paramı geri alabilir miyim?", a: "İptal talebi satıcı tarafından onaylanırsa iade süreci başlar. Anlaşmazlık olursa uyuşmazlık bildirebilirsiniz; admin inceleyip karar verir." },
-  { q: "Komisyon ne kadar?", a: "Alıcıdan %2, satıcıdan %2 komisyon alınır. Tutarlar işlem oluşturulurken ve ödeme öncesinde ayrı ayrı gösterilir." },
   { q: "Müşteri olarak hesap açmam gerekir mi?", a: "Hayır. Satıcının paylaştığı bağlantı veya işlem ID ile, telefon numaranıza gelen doğrulama koduyla işleminize erişirsiniz." },
 ];
 
@@ -133,7 +132,7 @@ export default function Landing() {
 
       {/* GUVENLI ODEME */}
       <section id="guvenli" className="scroll-mt-20 bg-surface py-20">
-        <div className="mx-auto grid max-w-7xl items-center gap-12 px-4 sm:px-6 lg:grid-cols-2">
+        <div className="mx-auto max-w-3xl px-4 sm:px-6">
           <div>
             <h2 className="text-3xl font-bold tracking-tight text-navy">Güvenli ödeme sistemi</h2>
             <p className="mt-3 text-muted">Kapora doğrudan satıcıya gitmez. İşlem sonuçlanana kadar güvenli havuzda tutulur; her hareket kayıt altına alınır.</p>
@@ -147,12 +146,6 @@ export default function Landing() {
                 <li key={t} className="flex gap-3"><CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-success" /><div><p className="font-semibold text-navy">{t}</p><p className="text-sm text-muted">{d}</p></div></li>
               ))}
             </ul>
-          </div>
-          <div className="card-shadow rounded-3xl border border-line bg-white p-6">
-            <p className="mb-4 text-sm font-semibold text-navy">Örnek komisyon hesabı • Kapora 10.000 TL</p>
-            {[["Alıcı komisyonu (%2)", "200 TL"], ["Satıcı komisyonu (%2)", "200 TL"], ["Toplam platform komisyonu", "400 TL"], ["Müşterinin ödeyeceği toplam", "10.200 TL"], ["Satıcıya net aktarım", "9.800 TL"]].map(([k, v], i) => (
-              <div key={k} className={`flex justify-between py-3 text-sm ${i ? "border-t border-line" : ""}`}><span className="text-muted">{k}</span><span className="font-semibold text-navy">{v}</span></div>
-            ))}
           </div>
         </div>
       </section>

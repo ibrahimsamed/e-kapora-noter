@@ -66,8 +66,20 @@ export function formatIban(i?: string): string {
   return i.replace(/\s/g, "").replace(/(.{4})/g, "$1 ").trim();
 }
 
+/** Yazarken tutarı "1.000.000,50" biçimine sokar (nokta binlik, virgül ondalık). */
+export function maskMoney(input: string): string {
+  const cleaned = input.replace(/[^\d,]/g, "");
+  const i = cleaned.indexOf(",");
+  const intPart = (i === -1 ? cleaned : cleaned.slice(0, i)).replace(/^0+(?=\d)/, "");
+  const grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  if (i === -1) return grouped;
+  const dec = cleaned.slice(i + 1).replace(/,/g, "").slice(0, 2);
+  return `${grouped || "0"},${dec}`;
+}
+
+/** "1.000.000,50" (TR biçimi) veya "1000.5" -> kuruş */
 export function tlToKurus(v: string | number): number {
-  const n = typeof v === "number" ? v : parseFloat(v.replace(",", "."));
+  const n = typeof v === "number" ? v : parseFloat(/,/.test(v) || /\..*\./.test(v) ? v.replace(/\./g, "").replace(",", ".") : v);
   if (!isFinite(n)) return 0;
   return Math.round(n * 100);
 }

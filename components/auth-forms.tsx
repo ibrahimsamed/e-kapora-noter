@@ -1,9 +1,10 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Smartphone, Lock, Mail } from "lucide-react";
-import { Button, Card, Field, Input, Logo, cn } from "./ui";
+import { ArrowLeft, Smartphone, Lock, Mail } from "lucide-react";
+import { useInAuthModal } from "./auth-modal";
+import { Button, Field, Input, Logo, cn } from "./ui";
 import { postJson } from "./use-action";
 
 function safeNext(v: string | null, fallback: string) {
@@ -11,16 +12,35 @@ function safeNext(v: string | null, fallback: string) {
 }
 
 function Frame({ title, subtitle, children, foot }: { title: string; subtitle: string; children: React.ReactNode; foot?: React.ReactNode }) {
+  const router = useRouter();
+  const inModal = useInAuthModal();
+  const close = () => (inModal ? router.back() : router.push("/"));
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => e.key === "Escape" && close();
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inModal]);
   return (
-    <div className="flex min-h-[calc(100vh-30px)] items-center justify-center px-4 py-10">
-      <div className="w-full max-w-md">
-        <Link href="/" className="mb-6 flex justify-center"><Logo className="text-xl" /></Link>
-        <Card className="p-6 sm:p-8">
-          <h1 className="text-xl font-bold text-navy">{title}</h1>
-          <p className="mt-1 text-sm text-muted">{subtitle}</p>
-          <div className="mt-6">{children}</div>
-        </Card>
-        {foot && <div className="mt-4 text-center text-sm text-muted">{foot}</div>}
+    <div
+      className={cn(
+        "fixed inset-0 z-50 flex items-center justify-center overflow-y-auto px-4 py-10",
+        inModal ? "bg-navy/30 backdrop-blur-md" : "bg-gradient-to-br from-navy via-navy-2 to-brand",
+      )}
+      onClick={close}
+      role="dialog"
+      aria-modal="true"
+    >
+      {!inModal && <div className="pointer-events-none absolute -right-32 -top-32 h-[480px] w-[480px] rounded-full bg-brand/40 blur-3xl" />}
+      <div className="relative w-full max-w-md rounded-3xl border border-white/40 bg-white/60 p-6 shadow-2xl ring-1 ring-white/30 backdrop-blur-2xl sm:p-8" onClick={(e) => e.stopPropagation()}>
+        <button type="button" onClick={close} className="mb-4 inline-flex items-center gap-1 rounded-lg text-sm font-semibold text-navy hover:text-brand">
+          <ArrowLeft className="h-4 w-4" /> Geri
+        </button>
+        <Link href="/" className="mb-5 flex justify-center"><Logo className="text-xl" /></Link>
+        <h1 className="text-xl font-bold text-navy">{title}</h1>
+        <p className="mt-1 text-sm text-ink/70">{subtitle}</p>
+        <div className="mt-6">{children}</div>
+        {foot && <div className="mt-6 border-t border-white/60 pt-4 text-center text-sm text-ink/70">{foot}</div>}
       </div>
     </div>
   );
@@ -149,7 +169,7 @@ export function CustomerLoginForm({ defaultTx = "" }: { defaultTx?: string }) {
     <Frame title="İşlemimi sorgula" subtitle="Telefon numaranızla doğrulayın; kayıt olmanız gerekmez." foot={<>Satıcı mısınız? <Link href="/giris" className="font-semibold text-brand">Satıcı girişi</Link></>}>
       {step === 1 ? (
         <form onSubmit={request} className="space-y-4">
-          <Field label="İşlem ID (opsiyonel)" hint="Satıcının paylaştığı ID, ör. EK-2026-000125"><Input value={txId} onChange={(e) => setTxId(e.target.value)} placeholder="EK-2026-000125" /></Field>
+          <Field label={defaultTx ? "İşlem ID" : "İşlem ID (opsiyonel)"} hint={defaultTx ? "Bağlantıdan otomatik geldi; yalnızca telefon numaranızı girin." : "Satıcının paylaştığı ID, ör. EK-2026-000125"}><Input value={txId} onChange={(e) => setTxId(e.target.value)} placeholder="EK-2026-000125" readOnly={!!defaultTx} className={defaultTx ? "bg-surface font-mono" : undefined} /></Field>
           <Field label="Cep telefonu"><Input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="0555 000 00 01" required /></Field>
           {err && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{err}</p>}
           <Button type="submit" className="w-full" size="lg" disabled={busy}><Smartphone className="h-4 w-4" /> Doğrulama kodu gönder</Button>

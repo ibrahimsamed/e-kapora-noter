@@ -4,9 +4,10 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 import type { Category } from "@/lib/types";
 import { CANCEL_POLICIES, CATEGORIES, CATEGORY_LABEL } from "@/lib/workflow";
-import { formatPhone, formatTRY, normalizePhone, tlToKurus } from "@/lib/format";
+import { formatPhone, formatTRY, maskMoney, normalizePhone, tlToKurus } from "@/lib/format";
 import { Button, Card, Field, Input, KV, Select, Textarea, cn } from "./ui";
 import { useAction } from "./use-action";
+import { TermsLink } from "./terms";
 
 const STEPS = ["İşlem türü", "Müşteri", "Detaylar", "Koşullar", "Komisyon ve onay"];
 const today = () => new Date().toISOString().slice(0, 10);
@@ -49,7 +50,7 @@ export function NewTxWizard({ buyerFeeBps, sellerFeeBps }: { buyerFeeBps: number
       if (f.refundPolicy.trim().length < 5) return "İade koşulu girin.";
       if (f.deliveryTerms.trim().length < 5) return "Teslimat / hizmet koşulu girin.";
     }
-    if (s === 4 && !f.accept) return "Devam etmek için işlem özetini onaylamalısınız.";
+    if (s === 4 && !f.accept) return "Devam etmek için şartlar ve koşulları okuyup onaylamalısınız.";
     return "";
   }
 
@@ -119,8 +120,8 @@ export function NewTxWizard({ buyerFeeBps, sellerFeeBps }: { buyerFeeBps: number
             <Field label="İşlem başlığı"><Input value={f.title} onChange={(e) => set("title", e.target.value)} placeholder="Örn. Villa kiralama — 15-18 Temmuz" /></Field>
             <Field label="Ürün veya hizmet açıklaması"><Textarea value={f.description} onChange={(e) => set("description", e.target.value)} /></Field>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Toplam satış / kiralama bedeli (TL)"><Input type="number" inputMode="decimal" min="0" step="0.01" value={f.total} onChange={(e) => set("total", e.target.value)} /></Field>
-              <Field label="Talep edilen kapora tutarı (TL)"><Input type="number" inputMode="decimal" min="0" step="0.01" value={f.deposit} onChange={(e) => set("deposit", e.target.value)} /></Field>
+              <Field label="Toplam satış / kiralama bedeli (TL)"><Input inputMode="decimal" placeholder="1.000.000,00" value={f.total} onChange={(e) => set("total", maskMoney(e.target.value))} /></Field>
+              <Field label="Talep edilen kapora tutarı (TL)"><Input inputMode="decimal" placeholder="10.000,00" value={f.deposit} onChange={(e) => set("deposit", maskMoney(e.target.value))} /></Field>
               <Field label="Hizmet / teslimat tarihi"><Input type="date" min={today()} value={f.serviceDate} onChange={(e) => set("serviceDate", e.target.value)} /></Field>
               <Field label="İşlem geçerlilik süresi" hint="Bu sürede ödeme yapılmazsa işlem sona erer.">
                 <Select value={f.validDays} onChange={(e) => set("validDays", e.target.value)}>
@@ -182,7 +183,7 @@ export function NewTxWizard({ buyerFeeBps, sellerFeeBps }: { buyerFeeBps: number
             </div>
             <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-line p-4 text-sm">
               <input type="checkbox" className="mt-1 h-4 w-4" checked={f.accept} onChange={(e) => set("accept", e.target.checked)} />
-              <span>İşlem özetini ve yukarıdaki anlaşma koşullarını kontrol ettim; işlemin oluşturulmasını ve müşteriye gönderilmesini onaylıyorum.</span>
+              <span>İşlem özetini ve anlaşma koşullarını kontrol ettim; <TermsLink onAccept={() => set("accept", true)}>şartlar ve koşulları</TermsLink> okudum, işlemin oluşturulmasını ve müşteriye gönderilmesini onaylıyorum.</span>
             </label>
           </div>
         )}

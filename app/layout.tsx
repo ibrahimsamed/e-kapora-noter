@@ -11,11 +11,11 @@ export const metadata: Metadata = {
     "Alıcı ve satıcı arasındaki kapora ödemelerini güvence altına alan dijital güvenli işlem platformu.",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({ children, modal }: { children: React.ReactNode; modal: React.ReactNode }) {
   return (
     <html lang="tr" className={`${inter.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
-        <ToastProvider>{children}</ToastProvider>
+        <ToastProvider>{children}{modal}</ToastProvider>
       </body>
     </html>
   );

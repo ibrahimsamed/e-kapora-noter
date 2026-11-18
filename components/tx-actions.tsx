@@ -9,6 +9,7 @@ import { DEMO_CARD_HINTS } from "@/lib/constants";
 import { Button, Card, CardHeader, Field, Input, Modal, Textarea } from "./ui";
 import { useAction } from "./use-action";
 import { useToast } from "./toast";
+import { TermsLink } from "./terms";
 
 type Mode = null | "pay" | "cancel" | "dispute" | "statement" | "cancelUnpaid" | "refundStart";
 
@@ -87,6 +88,7 @@ function PayModal({ open, onClose, data }: { open: boolean; onClose: () => void;
   const { run, busy } = useAction();
   const [f, setF] = useState({ number: "", name: "", exp: "", cvc: "" });
   const [res, setRes] = useState<{ ok: boolean; message: string } | null>(null);
+  const [terms, setTerms] = useState(false);
   const lock = useRef(false);
   const { tx } = data;
   const total = tx.deposit + tx.buyerFee;
@@ -94,10 +96,10 @@ function PayModal({ open, onClose, data }: { open: boolean; onClose: () => void;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (lock.current) return;
+    if (lock.current || !terms) return;
     lock.current = true;
     const r = await run<{ ok: boolean; message: string }>("tx.pay", {
-      txId: tx.id, idemKey: crypto.randomUUID(), card: f,
+      txId: tx.id, idemKey: crypto.randomUUID(), card: f, termsAccepted: terms,
     });
     lock.current = false;
     if (r.ok && r.data) setRes(r.data);
@@ -132,8 +134,12 @@ function PayModal({ open, onClose, data }: { open: boolean; onClose: () => void;
             <div className="flex justify-between"><span className="text-muted">Alıcı komisyonu (%{tx.buyerFeeBps / 100})</span><span>{formatTRY(tx.buyerFee)}</span></div>
             <div className="mt-1 flex justify-between border-t border-line pt-1 font-bold text-navy"><span>Toplam</span><span>{formatTRY(total)}</span></div>
           </div>
+          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-line p-3 text-sm">
+            <input type="checkbox" className="mt-0.5 h-4 w-4" checked={terms} onChange={(e) => setTerms(e.target.checked)} />
+            <span><TermsLink onAccept={() => setTerms(true)}>Şartlar ve koşulları</TermsLink> okudum, kabul ediyorum.</span>
+          </label>
           {res && !res.ok && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{res.message}</p>}
-          <Button type="submit" size="lg" className="w-full" disabled={busy}><CreditCard className="h-5 w-5" /> {busy ? "İşleniyor…" : `${formatTRY(total)} Öde`}</Button>
+          <Button type="submit" size="lg" className="w-full" disabled={busy || !terms}><CreditCard className="h-5 w-5" /> {busy ? "İşleniyor…" : `${formatTRY(total)} Öde`}</Button>
         </form>
       )}
     </Modal>
