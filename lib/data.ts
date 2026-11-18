@@ -36,7 +36,10 @@ const TABLES: TableSpec[] = [
   { key: "audit", table: "audit", ts: ["at"], insertOnly: true },
 ];
 
-const g = globalThis as unknown as { __ekSb?: SupabaseClient; __ekCache?: { seq: number; db: Db } };
+// Önbellek en fazla bu kadar yaşar: panelden elle yapılan değişiklikler seq'i artırmaz.
+const CACHE_TTL_MS = 10_000;
+
+const g = globalThis as unknown as { __ekSb?: SupabaseClient; __ekCache?: { seq: number; db: Db; at: number } };
 
 function client(): SupabaseClient {
   if (g.__ekSb) return g.__ekSb;
@@ -98,7 +101,7 @@ async function readSeq(): Promise<number> {
   return Number(data.seq);
 }
 
-async function loadAll(): Promise<{ seq: number; db: Db }> {
+async function loadAll(): Promise<{ seq: number; db: Db; at: number }> {
   const sb = client();
   const seq = await readSeq();
   const [meta, settings, ...tables] = await Promise.all([
@@ -118,12 +121,12 @@ async function loadAll(): Promise<{ seq: number; db: Db }> {
   TABLES.forEach((spec, i) => {
     (db as unknown as Record<string, unknown>)[spec.key] = (tables[i] as Row[]).map((r) => fromRow(r, spec));
   });
-  return { seq, db };
+  return { seq, db, at: Date.now() };
 }
 
-async function snapshot(force = false): Promise<{ seq: number; db: Db }> {
+async function snapshot(force = false): Promise<{ seq: number; db: Db; at: number }> {
   const cached = g.__ekCache;
-  if (!force && cached && cached.seq === (await readSeq())) return cached;
+  if (!force && cached && Date.now() - cached.at < CACHE_TTL_MS && cached.seq === (await readSeq())) return cached;
   let fresh = await loadAll();
   if (fresh.db.users.length === 0 && (await bootstrapAdmin())) fresh = await loadAll();
   g.__ekCache = fresh;
@@ -158,7 +161,7 @@ function isConflict(e: { code?: string; message?: string } | null) {
   return !!e && (e.code === "40001" || /CONFLICT/.test(e.message ?? ""));
 }
 
-async function commit(base: { seq: number; db: Db }, draft: Db): Promise<boolean> {
+async function commit(base: { seq: number; db: Db; at: number }, draft: Db): Promise<boolean> {
   const payload = {
     expected_seq: base.seq,
     meta: { id_seq: draft.meta.idSeq },
@@ -172,7 +175,7 @@ async function commit(base: { seq: number; db: Db }, draft: Db): Promise<boolean
   const { error } = await client().rpc("apply_changes", { p: payload });
   if (isConflict(error)) return false;
   if (error) throw new Error(`Supabase yazma hatası: ${error.message}`);
-  g.__ekCache = { seq: base.seq + 1, db: draft };
+  g.__ekCache = { seq: base.seq + 1, db: draft, at: Date.now() };
   return true;
 }
 
