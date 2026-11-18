@@ -2,7 +2,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Smartphone, Lock } from "lucide-react";
+import { Smartphone, Lock, Mail } from "lucide-react";
 import { Button, Card, Field, Input, Logo, cn } from "./ui";
 import { postJson } from "./use-action";
 
@@ -60,30 +60,58 @@ export function LoginForm() {
 export function RegisterForm() {
   const router = useRouter();
   const [f, setF] = useState({ name: "", businessName: "", email: "", phone: "", password: "" });
+  const [step, setStep] = useState<1 | 2>(1);
+  const [otp, setOtp] = useState<{ otpId: string; channel: "email" | "sms"; maskedTarget: string } | null>(null);
+  const [code, setCode] = useState("");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
+  async function sendCode(e?: React.FormEvent) {
+    e?.preventDefault();
     setBusy(true); setErr("");
-    const r = await postJson<{ home: string }>("/api/auth", { action: "register", payload: f });
-    if (!r.ok) { setErr(r.error ?? "Kayıt başarısız"); setBusy(false); return; }
+    const r = await postJson<{ otpId: string; channel: "email" | "sms"; maskedTarget: string }>("/api/auth", { action: "register.start", payload: f });
+    setBusy(false);
+    if (!r.ok || !r.data) { setErr(r.error ?? "Kod gönderilemedi"); return; }
+    setOtp(r.data); setCode(""); setStep(2);
+  }
+
+  async function verify(e: React.FormEvent) {
+    e.preventDefault();
+    if (!otp) return;
+    setBusy(true); setErr("");
+    const r = await postJson<{ home: string }>("/api/auth", { action: "register.verify", payload: { otpId: otp.otpId, code } });
+    if (!r.ok) { setErr(r.error ?? "Doğrulama başarısız"); setBusy(false); return; }
     router.push(r.data?.home ?? "/panel");
     router.refresh();
   }
 
+  const via = otp?.channel === "sms" ? "telefonunuza" : "e-posta adresinize";
+
   return (
-    <Frame title="Satıcı hesabı oluştur" subtitle="Ücretsiz hesabınızla güvenli işlem oluşturmaya başlayın." foot={<>Zaten hesabınız var mı? <Link href="/giris" className="font-semibold text-brand">Giriş yapın</Link></>}>
-      <form onSubmit={submit} className="space-y-4">
-        <Field label="Ad soyad"><Input value={f.name} onChange={set("name")} required /></Field>
-        <Field label="İşletme / marka adı"><Input value={f.businessName} onChange={set("businessName")} required /></Field>
-        <Field label="E-posta"><Input type="email" autoComplete="username" value={f.email} onChange={set("email")} required /></Field>
-        <Field label="Cep telefonu" hint="Örn. 0532 123 45 67"><Input type="tel" value={f.phone} onChange={set("phone")} required /></Field>
-        <Field label="Parola" hint="En az 8 karakter"><Input type="password" autoComplete="new-password" value={f.password} onChange={set("password")} minLength={8} required /></Field>
-        {err && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{err}</p>}
-        <Button type="submit" className="w-full" size="lg" disabled={busy}>{busy ? "Oluşturuluyor…" : "Hesap Oluştur"}</Button>
-      </form>
+    <Frame title="Satıcı hesabı oluştur" subtitle={step === 1 ? "Ücretsiz hesabınızla güvenli işlem oluşturmaya başlayın." : "E-postanıza gelen 6 haneli kodu girin."} foot={<>Zaten hesabınız var mı? <Link href="/giris" className="font-semibold text-brand">Giriş yapın</Link></>}>
+      {step === 1 ? (
+        <form onSubmit={sendCode} className="space-y-4">
+          <Field label="Ad soyad"><Input value={f.name} onChange={set("name")} required /></Field>
+          <Field label="İşletme / marka adı"><Input value={f.businessName} onChange={set("businessName")} required /></Field>
+          <Field label="E-posta" hint="Doğrulama kodu bu adrese gönderilir."><Input type="email" autoComplete="username" value={f.email} onChange={set("email")} required /></Field>
+          <Field label="Cep telefonu" hint="Örn. 0532 123 45 67"><Input type="tel" value={f.phone} onChange={set("phone")} required /></Field>
+          <Field label="Parola" hint="En az 8 karakter"><Input type="password" autoComplete="new-password" value={f.password} onChange={set("password")} minLength={8} required /></Field>
+          {err && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{err}</p>}
+          <Button type="submit" className="w-full" size="lg" disabled={busy}><Mail className="h-4 w-4" /> {busy ? "Kod gönderiliyor…" : "Doğrulama kodu gönder"}</Button>
+        </form>
+      ) : (
+        <form onSubmit={verify} className="space-y-4">
+          <p role="status" className="rounded-xl bg-brand-soft p-3 text-sm text-navy">Kod {via} gönderildi: <b>{otp?.maskedTarget}</b>. 5 dakika geçerlidir. Gelmediyse spam klasörüne bakın.</p>
+          <Field label="Doğrulama kodu"><Input inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} autoFocus required /></Field>
+          {err && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{err}</p>}
+          <Button type="submit" className="w-full" size="lg" disabled={busy || code.length !== 6}>{busy ? "Doğrulanıyor…" : "Doğrula ve hesabı oluştur"}</Button>
+          <div className="flex justify-between text-sm">
+            <button type="button" className="font-semibold text-brand" onClick={() => { setStep(1); setErr(""); }}>Bilgileri değiştir</button>
+            <button type="button" className="font-semibold text-brand disabled:opacity-50" disabled={busy} onClick={() => sendCode()}>Kodu tekrar gönder</button>
+          </div>
+        </form>
+      )}
     </Frame>
   );
 }

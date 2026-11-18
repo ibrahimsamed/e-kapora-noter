@@ -11,4 +11,3 @@ export default async function Page() {
   if (u && u.role !== "CUSTOMER") redirect(homeFor(u.role));
   return (<><DemoBanner /><Suspense><LoginForm /></Suspense></>);
 }
-//as

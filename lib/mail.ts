@@ -47,3 +47,14 @@ export function resetMail(name: string, link: string) {
 <p style="font-size:12px;color:#64748b">Bu isteği siz yapmadıysanız bu e-postayı yok sayabilirsiniz; parolanız değişmez.</p></div>`;
   return { subject: "Parola sıfırlama bağlantınız — e-kapora noter", text, html };
 }
+
+export function verifyMail(name: string, code: string) {
+  const text = `Merhaba ${name},\n\ne-kapora noter hesap doğrulama kodunuz: ${code}\n\nKod 5 dakika geçerlidir. Kimseyle paylaşmayın. Bu isteği siz yapmadıysanız bu e-postayı yok sayabilirsiniz.\n\ne-kapora noter`;
+  const html = `<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#253247">
+<h2 style="color:#0f2a4a">Hesap doğrulama</h2>
+<p>Merhaba ${esc(name)},</p>
+<p>Hesabınızı oluşturmak için doğrulama kodunuz:</p>
+<p style="margin:24px 0;font-size:32px;font-weight:bold;letter-spacing:8px;color:#1d4ed8">${esc(code)}</p>
+<p style="font-size:12px;color:#64748b">Kod 5 dakika geçerlidir. Kimseyle paylaşmayın. Bu isteği siz yapmadıysanız bu e-postayı yok sayabilirsiniz.</p></div>`;
+  return { subject: `Doğrulama kodunuz: ${code} — e-kapora noter`, text, html };
+}

@@ -1,8 +1,9 @@
 import bcrypt from "bcryptjs";
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, createHmac, randomBytes, randomInt, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import { mutate, getDb, supabase } from "./data";
-import { appUrl, resetMail, sendMail } from "./mail";
+import { appUrl, resetMail, sendMail, verifyMail } from "./mail";
+import { sendSms } from "./sms";
 import { nowIso, now } from "./clock";
 import { canTransition, STATUS_META } from "./workflow";
 import { escrowHeld, sellerBalances } from "./balances";
@@ -143,13 +144,122 @@ const registerSchema = z.object({
   password: z.string().min(8, "Parola en az 8 karakter olmalı").max(100),
 });
 
-export async function registerSeller(input: unknown): Promise<User> {
+const OTP_TTL_MS = 5 * 60 * 1000;
+const OTP_COOLDOWN_MS = 60 * 1000;
+const OTP_MAX_PER_HOUR = 5;
+const OTP_MAX_ATTEMPTS = 5;
+
+/** Kayıt doğrulama kanalı: "email" (varsayılan) veya "sms". SMS altyapısı hazırdır; REGISTER_VERIFY_CHANNEL=sms ile açılır. */
+type OtpChannel = "email" | "sms";
+const registerChannel = (): OtpChannel => (process.env.REGISTER_VERIFY_CHANNEL === "sms" ? "sms" : "email");
+
+const otpHash = (target: string, code: string) =>
+  createHmac("sha256", process.env.SESSION_SECRET ?? "demo-secret-degistir").update(`${target}:${code}`).digest("hex");
+
+const maskTarget = (channel: OtpChannel, target: string) =>
+  channel === "email"
+    ? target.replace(/^(.).*(@.*)$/, "$1***$2")
+    : `0${target.slice(0, 3)} *** ** ${target.slice(8)}`;
+
+interface PendingSeller {
+  name: string;
+  businessName: string;
+  email: string;
+  phone: string;
+  passwordHash: string;
+}
+
+/** Adım 1: bilgileri doğrular, e-postaya (veya SMS ile telefona) 6 haneli kod gönderir. Hesap henüz oluşturulmaz. */
+export async function startRegistration(input: unknown): Promise<{ otpId: string; channel: OtpChannel; maskedTarget: string; expiresInSec: number }> {
   const p = registerSchema.parse(input);
   const phone = normalizePhone(p.phone);
   if (!phone) fail("Geçerli bir cep telefonu girin (05xx xxx xx xx)");
+  const db = await getDb();
+  if (db.users.some((u) => u.email === p.email)) fail("Bu e-posta ile kayıtlı bir hesap var.", 409);
+  if (db.users.some((u) => u.phone === phone && u.role !== "CUSTOMER"))
+    fail("Bu telefon numarası başka bir hesapta kayıtlı.", 409);
+
+  const channel = registerChannel();
+  const target = channel === "email" ? p.email : (phone as string);
+  const col = channel === "email" ? "email" : "phone";
+  const sb = supabase();
+  const hourAgo = new Date(now().getTime() - 3600_000).toISOString();
+  const recent = await sb.from("sms_otps").select("created_at").eq("channel", channel).eq(col, target).gt("created_at", hourAgo).order("created_at", { ascending: false });
+  if (recent.error) throw new Error("sms_otps okunamadı");
+  if (recent.data.length >= OTP_MAX_PER_HOUR) fail("Çok fazla deneme yaptınız. Lütfen bir saat sonra tekrar deneyin.", 429);
+  if (recent.data[0] && now().getTime() - new Date(recent.data[0].created_at).getTime() < OTP_COOLDOWN_MS)
+    fail("Yeni kod için lütfen 1 dakika bekleyin.", 429);
+
+  const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
+  const pending: PendingSeller = {
+    name: p.name,
+    businessName: p.businessName,
+    email: p.email,
+    phone: phone as string,
+    passwordHash: bcrypt.hashSync(p.password, 8),
+  };
+  await sb.from("sms_otps").delete().eq("channel", channel).eq(col, target).is("consumed_at", null);
+  const ins = await sb
+    .from("sms_otps")
+    .insert({
+      purpose: "register",
+      channel,
+      phone,
+      email: p.email,
+      code_hash: otpHash(target, code),
+      payload: pending,
+      expires_at: new Date(now().getTime() + OTP_TTL_MS).toISOString(),
+    })
+    .select("id")
+    .single();
+  if (ins.error) throw new Error("sms_otps yazılamadı");
+  try {
+    if (channel === "email") await sendMail({ to: p.email, ...verifyMail(p.name, code) });
+    else await sendSms(phone as string, `e-kapora noter doğrulama kodunuz: ${code}. Kimseyle paylaşmayın.`);
+  } catch (e) {
+    await sb.from("sms_otps").delete().eq("id", ins.data.id);
+    console.error("[otp] doğrulama kodu gönderilemedi:", (e as { code?: string }).code ?? (e as Error).message);
+    fail("Doğrulama kodu gönderilemedi. Lütfen daha sonra tekrar deneyin.", 502);
+  }
+  return { otpId: ins.data.id as string, channel, maskedTarget: maskTarget(channel, target), expiresInSec: OTP_TTL_MS / 1000 };
+}
+
+/** Adım 2: kod doğruysa hesabı oluşturur ve kullanıcıyı döndürür (oturumu çağıran açar). */
+export async function verifyRegistration(otpId: string, codeRaw: string): Promise<User> {
+  const code = codeRaw.replace(/\s/g, "");
+  if (!/^[0-9a-f-]{36}$/.test(otpId) || !/^\d{6}$/.test(code)) fail("Doğrulama kodu hatalı.", 400);
+  const sb = supabase();
+  const row = await sb.from("sms_otps").select("*").eq("id", otpId).eq("purpose", "register").maybeSingle();
+  if (row.error) throw new Error("sms_otps okunamadı");
+  const o = row.data;
+  if (!o || o.consumed_at || new Date(o.expires_at).getTime() < now().getTime())
+    fail("Kodun süresi doldu. Lütfen yeni kod isteyin.", 400);
+  if (o.attempts >= OTP_MAX_ATTEMPTS) fail("Çok fazla hatalı deneme. Lütfen yeni kod isteyin.", 429);
+
+  // Deneme sayacı önce artırılır (iyimser kilit): paralel isteklerle sınır aşılamaz.
+  const bump = await sb.from("sms_otps").update({ attempts: o.attempts + 1 }).eq("id", o.id).eq("attempts", o.attempts).select("id");
+  if (bump.error) throw new Error("sms_otps güncellenemedi");
+  if (!bump.data.length) fail("İşlem çakıştı, lütfen tekrar deneyin.", 409);
+
+  const target = o.channel === "email" ? (o.email as string) : (o.phone as string);
+  const a = Buffer.from(otpHash(target, code));
+  const b = Buffer.from(o.code_hash as string);
+  if (a.length !== b.length || !timingSafeEqual(a, b)) fail("Doğrulama kodu hatalı.", 401);
+
+  // Tek kullanımlık: yalnızca bir istek kodu "kullanıldı" yapabilir.
+  const claim = await sb
+    .from("sms_otps")
+    .update({ consumed_at: new Date().toISOString() })
+    .eq("id", o.id)
+    .is("consumed_at", null)
+    .select("id");
+  if (claim.error) throw new Error("sms_otps güncellenemedi");
+  if (!claim.data.length) fail("Kod daha önce kullanıldı.", 409);
+
+  const p = o.payload as PendingSeller;
   return await mutate((db) => {
     if (db.users.some((u) => u.email === p.email)) fail("Bu e-posta ile kayıtlı bir hesap var.", 409);
-    if (db.users.some((u) => u.phone === phone && u.role !== "CUSTOMER"))
+    if (db.users.some((u) => u.phone === p.phone && u.role !== "CUSTOMER"))
       fail("Bu telefon numarası başka bir hesapta kayıtlı.", 409);
     const user: User = {
       id: nextId(db, "USR"),
@@ -157,14 +267,14 @@ export async function registerSeller(input: unknown): Promise<User> {
       name: p.name,
       businessName: p.businessName,
       email: p.email,
-      phone: phone as string,
-      passwordHash: bcrypt.hashSync(p.password, 8),
+      phone: p.phone,
+      passwordHash: p.passwordHash,
       active: true,
       createdAt: nowIso(),
       notif: { sms: true, email: true, whatsapp: false },
     };
     db.users.push(user);
-    audit(db, { id: user.id, role: "SELLER" }, "REGISTER", user.id, "Satıcı hesabı oluşturuldu");
+    audit(db, { id: user.id, role: "SELLER" }, "REGISTER", user.id, "Satıcı hesabı telefon doğrulamasıyla oluşturuldu");
     return user;
   });
 }

@@ -15,8 +15,9 @@ export async function POST(req: Request) {
         await createSession(u.id);
         return ok({ home: homeFor(u.role) });
       }
-      case "register": {
-        const u = await S.registerSeller(p);
+      case "register.start": return ok(await S.startRegistration(p));
+      case "register.verify": {
+        const u = await S.verifyRegistration(String(p.otpId ?? ""), String(p.code ?? ""));
         await createSession(u.id);
         return ok({ home: homeFor(u.role) });
       }
