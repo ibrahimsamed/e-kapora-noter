@@ -1,7 +1,7 @@
 "use client";
 import clsx from "clsx";
-import { useEffect } from "react";
-import { X, ShieldCheck } from "lucide-react";
+import { useEffect, useState } from "react";
+import { X, ShieldCheck, Eye, EyeOff } from "lucide-react";
 import { STATUS_META } from "@/lib/workflow";
 import type { TxStatus } from "@/lib/types";
 
@@ -72,6 +72,18 @@ export function Pill({ children, tone = "slate" }: { children: React.ReactNode; 
 const field = "w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-sm text-ink placeholder:text-slate-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20";
 export function Input(p: React.InputHTMLAttributes<HTMLInputElement>) {
   return <input {...p} className={cn(field, p.className)} />;
+}
+export function PasswordInput(p: Omit<React.InputHTMLAttributes<HTMLInputElement>, "type">) {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="relative">
+      <input {...p} type={show ? "text" : "password"} className={cn(field, "pr-11", p.className)} />
+      <button type="button" onClick={() => setShow((s) => !s)} aria-label={show ? "Şifreyi gizle" : "Şifreyi göster"} tabIndex={-1}
+        className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-muted hover:text-ink">
+        {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+      </button>
+    </div>
+  );
 }
 export function Select(p: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return <select {...p} className={cn(field, p.className)} />;

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Smartphone, Lock, Mail } from "lucide-react";
 import { useInAuthModal } from "./auth-modal";
-import { Button, Field, Input, Logo, cn } from "./ui";
+import { Button, Field, Input, PasswordInput, Logo, cn } from "./ui";
 import { postJson } from "./use-action";
 import { maskPhone } from "@/lib/format";
 
@@ -25,7 +25,7 @@ function Frame({ title, subtitle, children, foot }: { title: string; subtitle: s
   return (
     <div
       className={cn(
-        "fixed inset-0 z-50 flex items-center justify-center overflow-y-auto px-4 py-10",
+        "fixed inset-0 z-50 flex items-center justify-center overflow-y-auto px-4 py-6 sm:py-10",
         inModal ? "bg-navy/30 backdrop-blur-md" : "bg-gradient-to-br from-navy via-navy-2 to-brand",
       )}
       onClick={close}
@@ -33,14 +33,14 @@ function Frame({ title, subtitle, children, foot }: { title: string; subtitle: s
       aria-modal="true"
     >
       {!inModal && <div className="pointer-events-none absolute -right-32 -top-32 h-[480px] w-[480px] rounded-full bg-brand/40 blur-3xl" />}
-      <div className="relative w-full max-w-md rounded-3xl border border-white/40 bg-white/60 p-6 shadow-2xl ring-1 ring-white/30 backdrop-blur-2xl sm:p-8" onClick={(e) => e.stopPropagation()}>
-        <button type="button" onClick={close} className="mb-4 inline-flex items-center gap-1 rounded-lg text-sm font-semibold text-navy hover:text-brand">
+      <div className="relative w-full max-w-md my-auto max-h-[calc(100dvh-3rem)] overflow-y-auto rounded-2xl border border-white/40 bg-white/60 p-5 shadow-2xl ring-1 ring-white/30 backdrop-blur-2xl sm:max-h-none sm:rounded-3xl sm:p-8" onClick={(e) => e.stopPropagation()}>
+        <button type="button" onClick={close} className="mb-3 inline-flex items-center gap-1 rounded-lg text-sm font-semibold text-navy hover:text-brand">
           <ArrowLeft className="h-4 w-4" /> Geri
         </button>
-        <Link href="/" className="mb-5 flex justify-center"><Logo className="text-xl" /></Link>
+        <Link href="/" className="mb-4 hidden justify-center sm:flex"><Logo className="text-xl" /></Link>
         <h1 className="text-xl font-bold text-navy">{title}</h1>
         <p className="mt-1 text-sm text-ink/70">{subtitle}</p>
-        <div className="mt-6">{children}</div>
+        <div className="mt-4 sm:mt-6">{children}</div>
         {foot && <div className="mt-6 border-t border-white/60 pt-4 text-center text-sm text-ink/70">{foot}</div>}
       </div>
     </div>
@@ -69,7 +69,7 @@ export function LoginForm() {
     <Frame title="Giriş yap" subtitle="Satıcı veya yönetici hesabınızla devam edin." foot={<>Hesabınız yok mu? <Link href="/kayit" className="font-semibold text-brand">Ücretsiz hesap oluşturun</Link><br />Müşteri misiniz? <Link href="/musteri/giris" className="font-semibold text-brand">İşlemimi sorgula</Link></>}>
       <form onSubmit={submit} className="space-y-4">
         <Field label="E-posta"><Input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required /></Field>
-        <Field label="Parola"><Input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required /></Field>
+        <Field label="Parola"><PasswordInput autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required /></Field>
         <div className="-mt-1 text-right"><Link href="/sifremi-unuttum" className="text-sm font-semibold text-brand">Şifremi unuttum</Link></div>
         {err && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{err}</p>}
         <Button type="submit" className="w-full" size="lg" disabled={busy}><Lock className="h-4 w-4" /> {busy ? "Giriş yapılıyor…" : "Giriş Yap"}</Button>
@@ -117,7 +117,7 @@ export function RegisterForm() {
           <Field label="İşletme / marka adı"><Input value={f.businessName} onChange={set("businessName")} required /></Field>
           <Field label="E-posta" hint="Doğrulama kodu bu adrese gönderilir."><Input type="email" autoComplete="username" value={f.email} onChange={set("email")} required /></Field>
           <Field label="Cep telefonu" hint="Örn. 532 123 45 67"><Input type="tel" inputMode="numeric" placeholder="532 123 45 67" value={f.phone} onChange={(e) => setF((x) => ({ ...x, phone: maskPhone(e.target.value) }))} required /></Field>
-          <Field label="Parola" hint="En az 8 karakter"><Input type="password" autoComplete="new-password" value={f.password} onChange={set("password")} minLength={8} required /></Field>
+          <Field label="Parola" hint="En az 8 karakter"><PasswordInput autoComplete="new-password" value={f.password} onChange={set("password")} minLength={8} required /></Field>
           {err && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{err}</p>}
           <Button type="submit" className="w-full" size="lg" disabled={busy}><Mail className="h-4 w-4" /> {busy ? "Kod gönderiliyor…" : "Doğrulama kodu gönder"}</Button>
         </form>
@@ -170,7 +170,7 @@ export function CustomerLoginForm({ defaultTx = "" }: { defaultTx?: string }) {
     <Frame title="İşlemimi sorgula" subtitle="Telefon numaranızla doğrulayın; kayıt olmanız gerekmez." foot={<>Satıcı mısınız? <Link href="/giris" className="font-semibold text-brand">Satıcı girişi</Link></>}>
       {step === 1 ? (
         <form onSubmit={request} className="space-y-4">
-          <Field label={defaultTx ? "İşlem ID" : "İşlem ID (opsiyonel)"} hint={defaultTx ? "Bağlantıdan otomatik geldi; yalnızca telefon numaranızı girin." : "Satıcının paylaştığı ID, ör. EK-2026-000125"}><Input value={txId} onChange={(e) => setTxId(e.target.value)} placeholder="EK-2026-000125" readOnly={!!defaultTx} className={defaultTx ? "bg-surface font-mono" : undefined} /></Field>
+          <Field label="İşlem ID" hint={defaultTx ? "Bağlantıdan otomatik geldi; yalnızca telefon numaranızı girin." : "Satıcının paylaştığı ID, ör. EK-2026-000125"}><Input value={txId} onChange={(e) => setTxId(e.target.value)} placeholder="EK-2026-000125" required readOnly={!!defaultTx} className={defaultTx ? "bg-surface font-mono" : undefined} /></Field>
           <Field label="Cep telefonu"><Input type="tel" inputMode="numeric" value={phone} onChange={(e) => setPhone(maskPhone(e.target.value))} placeholder="555 000 00 01" required /></Field>
           {err && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{err}</p>}
           <Button type="submit" className="w-full" size="lg" disabled={busy}><Smartphone className="h-4 w-4" /> Doğrulama kodu gönder</Button>
@@ -246,8 +246,8 @@ export function ResetPasswordForm({ token }: { token: string }) {
         <p role="status" className="rounded-xl bg-brand-soft p-4 text-sm text-navy">Parolanız değiştirildi. Giriş sayfasına yönlendiriliyorsunuz…</p>
       ) : (
         <form onSubmit={submit} className="space-y-4">
-          <Field label="Yeni parola"><Input type="password" autoComplete="new-password" minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} required /></Field>
-          <Field label="Yeni parola (tekrar)"><Input type="password" autoComplete="new-password" minLength={8} value={again} onChange={(e) => setAgain(e.target.value)} required /></Field>
+          <Field label="Yeni parola"><PasswordInput autoComplete="new-password" minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} required /></Field>
+          <Field label="Yeni parola (tekrar)"><PasswordInput autoComplete="new-password" minLength={8} value={again} onChange={(e) => setAgain(e.target.value)} required /></Field>
           {err && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{err}</p>}
           <Button type="submit" className="w-full" size="lg" disabled={busy}><Lock className="h-4 w-4" /> {busy ? "Kaydediliyor…" : "Parolayı değiştir"}</Button>
         </form>

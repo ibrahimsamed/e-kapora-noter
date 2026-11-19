@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { Download, Eye, FileText, Search } from "lucide-react";
 import type { TxRow } from "@/lib/queries";
@@ -15,6 +16,7 @@ export function TxTable({
   rows: TxRow[]; base: string; counterpart: "customer" | "seller" | "both"; statuses?: TxStatus[]; title?: string; exportCsv?: boolean; pageSize?: number;
 }) {
   const toast = useToast();
+  const router = useRouter();
   const [q, setQ] = useState({ id: "", name: "", status: "", cat: "", from: "", to: "" });
   const [page, setPage] = useState(1);
   const [pdfBusy, setPdfBusy] = useState<string | null>(null);
@@ -101,7 +103,7 @@ export function TxTable({
             </thead>
             <tbody className="divide-y divide-line">
               {view.map((r) => (
-                <tr key={r.id} className="hover:bg-surface/60">
+                <tr key={r.id} className="cursor-pointer hover:bg-surface/60" onClick={() => router.push(`${base}/${r.id}`)}>
                   <td className="whitespace-nowrap px-4 py-3 font-mono text-xs font-semibold text-navy">{r.id}</td>
                   <td className="px-4 py-3">
                     {counterpart === "seller" ? r.sellerName : counterpart === "both" ? (<><div>{r.customerName}</div><div className="text-xs text-muted">{r.sellerName}</div></>) : r.customerName}
@@ -112,7 +114,7 @@ export function TxTable({
                   <td className="px-4 py-3"><StatusBadge status={r.status} /></td>
                   <td className="px-4 py-3 whitespace-nowrap">{formatShortDate(r.createdAt)}</td>
                   <td className="px-4 py-3">
-                    <div className="flex justify-end gap-1">
+                    <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
                       <Link href={`${base}/${r.id}`} className="inline-flex items-center gap-1 rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold hover:bg-white"><Eye className="h-3.5 w-3.5" /> Detay</Link>
                       <Button size="sm" variant="outline" onClick={() => pdf(r.id)} disabled={pdfBusy === r.id} aria-label={`${r.id} PDF indir`}>
                         <FileText className="h-3.5 w-3.5" /> {pdfBusy === r.id ? "…" : "PDF"}

@@ -354,10 +354,9 @@ export async function requestOtp(phoneRaw: string, txId?: string): Promise<{ pho
   const db = await getDb();
   const cust = db.users.find((u) => u.phone === phone && u.role === "CUSTOMER");
   if (!cust) fail("Bu telefon numarası ile eşleşen bir işlem bulunamadı.", 404);
-  if (txId) {
-    const tx = db.transactions.find((t) => t.id === txId.trim().toUpperCase());
-    if (!tx || tx.customerId !== (cust as User).id) fail("İşlem ID ve telefon numarası eşleşmiyor.", 404);
-  }
+  if (!txId?.trim()) fail("İşlem ID zorunludur.");
+  const tx = db.transactions.find((t) => t.id === (txId as string).trim().toUpperCase());
+  if (!tx || tx.customerId !== (cust as User).id) fail("İşlem ID ve telefon numarası eşleşmiyor.", 404);
   return { phone: phone as string, demoCode: DEMO_OTP };
 }
 

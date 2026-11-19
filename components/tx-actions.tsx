@@ -126,7 +126,7 @@ function PayModal({ open, onClose, data }: { open: boolean; onClose: () => void;
           <Field label="Kart numarası"><Input inputMode="numeric" autoComplete="off" placeholder="4242 4242 4242 4242" value={f.number} onChange={(e) => setF({ ...f, number: fmtNum(e.target.value) })} required /></Field>
           <Field label="Kart üzerindeki isim"><Input autoComplete="off" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} required /></Field>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Son kullanma (AA/YY)"><Input placeholder="12/30" maxLength={5} autoComplete="off" value={f.exp} onChange={(e) => setF({ ...f, exp: e.target.value.replace(/[^\d/]/g, "") })} required /></Field>
+            <Field label="Son kullanma (AA/YY)"><Input placeholder="12/30" maxLength={5} autoComplete="off" value={f.exp} onChange={(e) => { const d = e.target.value.replace(/\D/g, "").slice(0, 4); setF({ ...f, exp: d.length > 2 ? `${d.slice(0, 2)}/${d.slice(2)}` : d }); }} required /></Field>
             <Field label="CVC"><Input inputMode="numeric" maxLength={3} autoComplete="off" value={f.cvc} onChange={(e) => setF({ ...f, cvc: e.target.value.replace(/\D/g, "") })} required /></Field>
           </div>
           <div className="rounded-xl bg-surface p-3 text-sm">
