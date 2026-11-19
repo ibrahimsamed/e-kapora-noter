@@ -158,14 +158,12 @@ export function NewTxWizard({ buyerFeeBps, sellerFeeBps }: { buyerFeeBps: number
             <h2 className="text-lg font-semibold text-navy">Komisyon ve onay</h2>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="rounded-xl bg-surface p-4">
-                <p className="text-xs font-semibold uppercase text-muted">Komisyon hesabı</p>
+                <p className="text-xs font-semibold uppercase text-muted">Tutar özeti</p>
                 <dl className="divide-y divide-line">
-                  <KV k="Kapora" v={formatTRY(deposit)} />
-                  <KV k={`Alıcı komisyonu (%${buyerFeeBps / 100})`} v={formatTRY(buyerFee)} />
-                  <KV k={`Satıcı komisyonu (%${sellerFeeBps / 100})`} v={formatTRY(sellerFee)} />
-                  <KV k="Toplam platform komisyonu" v={<b>{formatTRY(buyerFee + sellerFee)}</b>} />
-                  <KV k="Müşterinin ödeyeceği" v={formatTRY(deposit + buyerFee)} />
-                  <KV k="Size aktarılacak net" v={<b className="text-success">{formatTRY(deposit - sellerFee)}</b>} />
+                  <KV k="Ürün / hizmet bedeli" v={formatTRY(total)} />
+                  <KV k="Talep edilen kapora oranı" v={`%${total > 0 ? Math.round((deposit / total) * 10000) / 100 : 0}`.replace(".", ",")} />
+                  <KV k="Talep edilen kapora" v={<b>{formatTRY(deposit)}</b>} />
+                  <KV k="Sistemden alınacak ücret" v={formatTRY(sellerFee)} />
                 </dl>
               </div>
               <div className="rounded-xl bg-surface p-4">

@@ -131,7 +131,7 @@ function PayModal({ open, onClose, data }: { open: boolean; onClose: () => void;
           </div>
           <div className="rounded-xl bg-surface p-3 text-sm">
             <div className="flex justify-between"><span className="text-muted">Kapora</span><span>{formatTRY(tx.deposit)}</span></div>
-            <div className="flex justify-between"><span className="text-muted">Alıcı komisyonu (%{tx.buyerFeeBps / 100})</span><span>{formatTRY(tx.buyerFee)}</span></div>
+            <div className="flex justify-between"><span className="text-muted">Sistem ücreti</span><span>{formatTRY(tx.buyerFee)}</span></div>
             <div className="mt-1 flex justify-between border-t border-line pt-1 font-bold text-navy"><span>Toplam</span><span>{formatTRY(total)}</span></div>
           </div>
           <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-line p-3 text-sm">

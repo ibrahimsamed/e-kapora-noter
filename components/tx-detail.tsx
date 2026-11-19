@@ -21,6 +21,9 @@ export function TxDetail({ data, role }: { data: TxDetailData; role: Role }) {
   const showCustomer = role !== "CUSTOMER";
   const lastEvent = tx.events.length - 1;
   const totalPay = tx.deposit + tx.buyerFee;
+  const isAdmin = role === "ADMIN";
+  const rate = tx.totalAmount > 0 ? `%${(Math.round((tx.deposit / tx.totalAmount) * 10000) / 100).toString().replace(".", ",")}` : "—";
+  const myFee = role === "CUSTOMER" ? tx.buyerFee : tx.sellerFee;
 
   return (
     <div className="space-y-6">
@@ -37,8 +40,10 @@ export function TxDetail({ data, role }: { data: TxDetailData; role: Role }) {
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Summary label="Toplam bedel" value={formatTRY(tx.totalAmount)} />
-        <Summary label="Kapora" value={formatTRY(tx.deposit)} sub={`Müşteri toplam ${formatTRY(totalPay)} öder`} />
-        <Summary label="Komisyon" value={formatTRY(tx.buyerFee + tx.sellerFee)} sub={`Alıcı ${formatTRY(tx.buyerFee)} • Satıcı ${formatTRY(tx.sellerFee)}`} />
+        <Summary label="Kapora" value={formatTRY(tx.deposit)} sub={isAdmin ? `Müşteri toplam ${formatTRY(totalPay)} öder` : `Kapora oranı ${rate}`} />
+        {isAdmin
+          ? <Summary label="Komisyon" value={formatTRY(tx.buyerFee + tx.sellerFee)} sub={`Alıcı ${formatTRY(tx.buyerFee)} • Satıcı ${formatTRY(tx.sellerFee)}`} />
+          : <Summary label="Sistem ücreti" value={formatTRY(myFee)} />}
         <Summary label="Güvence altındaki tutar" value={formatTRY(held)} sub={held ? "Güvenli havuzda" : "Havuzda tutar yok"} />
       </div>
 
@@ -91,7 +96,7 @@ export function TxDetail({ data, role }: { data: TxDetailData; role: Role }) {
                     {payments.filter((p) => p.status === "FAILED").map((p) => (
                       <tr key={p.id}><td className="px-5 py-2.5 whitespace-nowrap">{formatDateTime(p.at)}</td><td className="px-5 py-2.5">Başarısız ödeme denemesi <span className="text-red-600">({p.failReason})</span></td><td className="px-5 py-2.5 text-right text-muted line-through">{formatTRY(p.amount)}</td></tr>
                     ))}
-                    {ledger.map((l) => (
+                    {ledger.filter((l) => isAdmin || l.kind !== "COMMISSION").map((l) => (
                       <tr key={l.id}><td className="px-5 py-2.5 whitespace-nowrap">{formatDateTime(l.at)}</td><td className="px-5 py-2.5"><p>{LEDGER_LABEL[l.kind]}</p><p className="text-xs text-muted">{l.note}</p></td><td className="px-5 py-2.5 text-right font-medium tabular-nums">{formatTRY(l.amount)}</td></tr>
                     ))}
                   </tbody>
@@ -116,11 +121,16 @@ export function TxDetail({ data, role }: { data: TxDetailData; role: Role }) {
             <CardHeader title="Tutar özeti" />
             <dl className="divide-y divide-line px-5 py-2">
               <KV k="Toplam bedel" v={formatTRY(tx.totalAmount)} />
+              <KV k="Kapora oranı" v={rate} />
               <KV k="Kapora" v={formatTRY(tx.deposit)} />
-              <KV k={`Alıcı komisyonu (%${tx.buyerFeeBps / 100})`} v={formatTRY(tx.buyerFee)} />
-              <KV k="Toplam ödenecek" v={<b>{formatTRY(totalPay)}</b>} />
-              <KV k={`Satıcı komisyonu (%${tx.sellerFeeBps / 100})`} v={formatTRY(tx.sellerFee)} />
-              <KV k="Satıcıya net aktarım" v={formatTRY(tx.deposit - tx.sellerFee)} />
+              {isAdmin ? (<>
+                <KV k={`Alıcı komisyonu (%${tx.buyerFeeBps / 100})`} v={formatTRY(tx.buyerFee)} />
+                <KV k="Toplam ödenecek" v={<b>{formatTRY(totalPay)}</b>} />
+                <KV k={`Satıcı komisyonu (%${tx.sellerFeeBps / 100})`} v={formatTRY(tx.sellerFee)} />
+                <KV k="Satıcıya net aktarım" v={formatTRY(tx.deposit - tx.sellerFee)} />
+              </>) : (
+                <KV k="Sistem ücreti" v={formatTRY(myFee)} />
+              )}
               {tx.refund && <KV k="İade edilen" v={<span className="text-purple-700">{formatTRY(tx.refund.amount)}</span>} />}
             </dl>
           </Card>
