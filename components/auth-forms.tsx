@@ -12,7 +12,7 @@ function safeNext(v: string | null, fallback: string) {
   return v && v.startsWith("/") && !v.startsWith("//") ? v : fallback;
 }
 
-function Frame({ title, subtitle, children, foot }: { title: string; subtitle: string; children: React.ReactNode; foot?: React.ReactNode }) {
+function Frame({ title, subtitle, children, foot }: { title: string; subtitle?: string; children: React.ReactNode; foot?: React.ReactNode }) {
   const router = useRouter();
   const inModal = useInAuthModal();
   const close = () => (inModal ? router.back() : router.push("/"));
@@ -39,7 +39,7 @@ function Frame({ title, subtitle, children, foot }: { title: string; subtitle: s
         </button>
         <Link href="/" className="mb-4 hidden justify-center sm:flex"><Logo className="text-xl" /></Link>
         <h1 className="text-xl font-bold text-navy">{title}</h1>
-        <p className="mt-1 text-sm text-ink/70">{subtitle}</p>
+        {subtitle && <p className="mt-1 text-sm text-ink/70">{subtitle}</p>}
         <div className="mt-4 sm:mt-6">{children}</div>
         {foot && <div className="mt-6 border-t border-white/60 pt-4 text-center text-sm text-ink/70">{foot}</div>}
       </div>
@@ -81,6 +81,7 @@ export function LoginForm() {
 export function RegisterForm() {
   const router = useRouter();
   const [f, setF] = useState({ name: "", businessName: "", email: "", phone: "", password: "" });
+  const [again, setAgain] = useState("");
   const [step, setStep] = useState<1 | 2>(1);
   const [otp, setOtp] = useState<{ otpId: string; channel: "email" | "sms"; maskedTarget: string } | null>(null);
   const [code, setCode] = useState("");
@@ -90,6 +91,8 @@ export function RegisterForm() {
 
   async function sendCode(e?: React.FormEvent) {
     e?.preventDefault();
+    if (f.password.length < 8) { setErr("Parola en az 8 karakter olmalı."); return; }
+    if (f.password !== again) { setErr("Parolalar eşleşmiyor."); return; }
     setBusy(true); setErr("");
     const r = await postJson<{ otpId: string; channel: "email" | "sms"; maskedTarget: string }>("/api/auth", { action: "register.start", payload: f });
     setBusy(false);
@@ -110,16 +113,17 @@ export function RegisterForm() {
   const via = otp?.channel === "sms" ? "telefonunuza" : "e-posta adresinize";
 
   return (
-    <Frame title="Satıcı hesabı oluştur" subtitle={step === 1 ? "Ücretsiz hesabınızla güvenli işlem oluşturmaya başlayın." : "E-postanıza gelen 6 haneli kodu girin."} foot={<>Zaten hesabınız var mı? <Link href="/giris" className="font-semibold text-brand">Giriş yapın</Link></>}>
+    <Frame title="Satıcı hesabı oluştur" subtitle={step === 1 ? undefined : "E-postanıza gelen 6 haneli kodu girin."} foot={<>Zaten hesabınız var mı? <Link href="/giris" className="font-semibold text-brand">Giriş yapın</Link></>}>
       {step === 1 ? (
-        <form onSubmit={sendCode} className="space-y-4">
+        <form onSubmit={sendCode} className="space-y-3">
           <Field label="Ad soyad"><Input value={f.name} onChange={set("name")} required /></Field>
           <Field label="İşletme / marka adı"><Input value={f.businessName} onChange={set("businessName")} required /></Field>
-          <Field label="E-posta" hint="Doğrulama kodu bu adrese gönderilir."><Input type="email" autoComplete="username" value={f.email} onChange={set("email")} required /></Field>
-          <Field label="Cep telefonu" hint="Örn. 532 123 45 67"><Input type="tel" inputMode="numeric" placeholder="532 123 45 67" value={f.phone} onChange={(e) => setF((x) => ({ ...x, phone: maskPhone(e.target.value) }))} required /></Field>
-          <Field label="Parola" hint="En az 8 karakter"><PasswordInput autoComplete="new-password" value={f.password} onChange={set("password")} minLength={8} required /></Field>
+          <Field label="E-posta"><Input type="email" autoComplete="username" value={f.email} onChange={set("email")} required /></Field>
+          <Field label="Cep telefonu"><Input type="tel" inputMode="numeric" placeholder="532 123 45 67" value={f.phone} onChange={(e) => setF((x) => ({ ...x, phone: maskPhone(e.target.value) }))} required /></Field>
+          <Field label="Parola"><PasswordInput autoComplete="new-password" placeholder="En az 8 karakter" value={f.password} onChange={set("password")} required /></Field>
+          <Field label="Parola (tekrar)"><PasswordInput autoComplete="new-password" placeholder="Parolayı tekrar girin" value={again} onChange={(e) => setAgain(e.target.value)} required /></Field>
           {err && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{err}</p>}
-          <Button type="submit" className="w-full" size="lg" disabled={busy}><Mail className="h-4 w-4" /> {busy ? "Kod gönderiliyor…" : "Doğrulama kodu gönder"}</Button>
+          <Button type="submit" className="w-full" size="lg" disabled={busy}><Mail className="h-4 w-4" /> {busy ? "Hesap oluşturuluyor…" : "Hesap oluştur"}</Button>
         </form>
       ) : (
         <form onSubmit={verify} className="space-y-4">
