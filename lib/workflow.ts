@@ -12,7 +12,7 @@ export interface StatusMeta {
 export const STATUS_META: Record<TxStatus, StatusMeta> = {
   CREATED: { label: "Oluşturuldu", badge: "bg-slate-100 text-slate-700 ring-slate-200", dot: "bg-slate-400", hex: "#94a3b8", description: "İşlem kaydı oluşturuldu." },
   WAITING_FOR_PAYMENT: { label: "Ödeme Bekleniyor", badge: "bg-amber-50 text-amber-800 ring-amber-200", dot: "bg-amber-500", hex: "#f59e0b", description: "Müşterinin ödeme yapması bekleniyor." },
-  PAYMENT_PROCESSING: { label: "Ödeme İşleniyor", badge: "bg-sky-50 text-sky-800 ring-sky-200", dot: "bg-sky-500", hex: "#0ea5e9", description: "Ödeme doğrulanıyor." },
+  PAYMENT_PROCESSING: { label: "Ödeme İşleniyor", badge: "bg-sky-50 text-sky-800 ring-sky-200", dot: "bg-sky-500", hex: "#0ea5e9", description: "Ödeme doğrulanıyor (havale bildirimi admin onayı bekliyor)." },
   SECURED: { label: "Güvence Altında", badge: "bg-emerald-50 text-emerald-800 ring-emerald-200", dot: "bg-emerald-500", hex: "#16a36a", description: "Kapora güvenli havuzda tutuluyor." },
   WAITING_FOR_CONFIRMATION: { label: "Onay Bekleniyor", badge: "bg-blue-50 text-blue-800 ring-blue-200", dot: "bg-blue-500", hex: "#2864dc", description: "Taraflardan biri onayladı, diğer onay bekleniyor." },
   COMPLETED: { label: "Tamamlandı", badge: "bg-green-100 text-green-800 ring-green-300", dot: "bg-green-600", hex: "#15803d", description: "İki taraf onayladı, tutar satıcıya aktarıldı." },
@@ -38,8 +38,8 @@ export const TRANSITIONS: Record<TxStatus, Partial<Record<TxStatus, ActorRole[]>
     EXPIRED: ["SYSTEM", "ADMIN"],
   },
   PAYMENT_PROCESSING: {
-    SECURED: ["SYSTEM"],
-    WAITING_FOR_PAYMENT: ["SYSTEM"],
+    SECURED: ["SYSTEM", "ADMIN"],
+    WAITING_FOR_PAYMENT: ["SYSTEM", "ADMIN"],
   },
   SECURED: {
     WAITING_FOR_CONFIRMATION: ["CUSTOMER", "SELLER"],

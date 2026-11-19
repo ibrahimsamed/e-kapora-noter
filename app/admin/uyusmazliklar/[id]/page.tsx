@@ -54,7 +54,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
           <Card>
             <CardHeader title="Ödeme hareketleri" />
             <ul className="divide-y divide-line px-5">
-              {payments.map((p) => <li key={p.id} className="flex justify-between py-3 text-sm"><span>Ödeme denemesi •••• {p.cardLast4} — {p.status === "SUCCESS" ? "Başarılı" : "Başarısız"}</span><span>{formatTRY(p.amount)}</span></li>)}
+              {payments.map((p) => <li key={p.id} className="flex justify-between py-3 text-sm"><span>Ödeme denemesi {p.cardLast4 === "HAVALE" ? "(havale/EFT)" : `•••• ${p.cardLast4}`} — {p.status === "SUCCESS" ? "Başarılı" : "Başarısız"}</span><span>{formatTRY(p.amount)}</span></li>)}
               {ledger.map((l) => <li key={l.id} className="flex justify-between py-3 text-sm"><span>{LEDGER_LABEL[l.kind]} <span className="text-xs text-muted">• {formatDateTime(l.at)}</span></span><span className="font-medium">{formatTRY(l.amount)}</span></li>)}
             </ul>
           </Card>

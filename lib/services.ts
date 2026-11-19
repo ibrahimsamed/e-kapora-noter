@@ -525,6 +525,52 @@ export async function payTransaction(actor: Actor, input: unknown): Promise<{ ok
   });
 }
 
+/** Müşteri havale/EFT yaptığını bildirir; admin hesabı kontrol edip onaylayana kadar işlem "Ödeme İşleniyor"da bekler. */
+export async function notifyTransfer(actor: Actor, txId: string) {
+  if (actor.role !== "CUSTOMER") fail("Yalnızca müşteri havale bildirimi yapabilir.", 403);
+  return await mutate((db) => {
+    const tx = getTx(db, txId);
+    assertAccess(tx, actor);
+    activeUser(db, actor);
+    if (isExpired(tx)) {
+      tx.closeReason = "Geçerlilik süresi içinde ödeme yapılmadı.";
+      transition(db, tx, "EXPIRED", SYSTEM, "İşlem geçerlilik süresi doldu");
+      return { status: tx.status };
+    }
+    if (tx.status !== "WAITING_FOR_PAYMENT") fail("Bu işlem için ödeme bildirilemez (durum: " + STATUS_META[tx.status].label + ").", 409);
+    transition(db, tx, "PAYMENT_PROCESSING", actor, `Müşteri havale/EFT yaptığını bildirdi (açıklama: ${tx.id})`);
+    return { status: tx.status };
+  });
+}
+
+/** Admin: havale hesaba ulaştıysa onaylar (güvenli havuza alır), ulaşmadıysa reddeder (ödeme bekleniyora döner). */
+export async function decideTransfer(actor: Actor, input: { txId: string; approve: boolean }) {
+  if (actor.role !== "ADMIN") fail("Yetkisiz işlem", 403);
+  return await mutate((db) => {
+    const tx = getTx(db, input.txId);
+    if (tx.status !== "PAYMENT_PROCESSING") fail("Bu işlemde onay bekleyen havale yok.", 409);
+    if (!input.approve) {
+      transition(db, tx, "WAITING_FOR_PAYMENT", actor, "Havale hesaba ulaşmadı; ödeme tekrar bekleniyor");
+      return { status: tx.status };
+    }
+    if (db.payments.some((x) => x.txId === tx.id && x.status === "SUCCESS")) fail("Bu işlem için ödeme zaten yapılmış.", 409);
+    const amount = tx.deposit + tx.buyerFee;
+    db.payments.push({
+      id: nextId(db, "PAY"),
+      txId: tx.id,
+      amount,
+      cardLast4: "HAVALE",
+      status: "SUCCESS",
+      at: nowIso(),
+      idemKey: `transfer-${tx.id}`,
+    });
+    ledger(db, tx, "PAYMENT", amount, "Havale/EFT ödemesi (kapora + alıcı komisyonu)");
+    tx.securedAt = nowIso();
+    transition(db, tx, "SECURED", actor, "Havale onaylandı; ödeme güvence altına alındı");
+    return { status: tx.status };
+  });
+}
+
 function releaseToSeller(db: Db, tx: Transaction, actor: AnyActor, label: string) {
   const held = escrowHeld(db, tx.id);
   const expected = tx.deposit + tx.buyerFee;

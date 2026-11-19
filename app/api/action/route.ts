@@ -13,6 +13,8 @@ export async function POST(req: Request) {
     switch (action) {
       case "tx.create": return ok(await S.createTransaction(actor, p));
       case "tx.pay": return ok(await S.payTransaction(actor, p));
+      case "tx.notifyTransfer": return ok(await S.notifyTransfer(actor, p.txId));
+      case "tx.decideTransfer": return ok(await S.decideTransfer(actor, p));
       case "tx.confirm": return ok(await S.confirmTransaction(actor, p.txId));
       case "tx.cancelUnpaid": return ok(await S.cancelUnpaid(actor, p.txId));
       case "tx.requestCancel": return ok(await S.requestCancel(actor, p));

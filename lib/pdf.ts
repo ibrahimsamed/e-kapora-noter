@@ -101,7 +101,7 @@ export async function downloadTxPdf(d: TxDetailData) {
     ["Müşteri onayı", formatDateTime(tx.buyerConfirmedAt), tx.buyerConfirmedAt ? "Onaylandı" : "Bekleniyor"],
     ["Güvence altına alma", formatDateTime(tx.securedAt), tx.securedAt ? "Ödeme güvence altına alındı" : "—"],
     ["Tamamlanma", formatDateTime(tx.completedAt), tx.completedAt ? "İşlem tamamlandı" : "—"],
-    ...payments.map((p) => ["Ödeme (kart •••• " + p.cardLast4 + ")", formatDateTime(p.at), `${formatTRY(p.amount)} — ${p.status === "SUCCESS" ? "Başarılı" : "Başarısız: " + (p.failReason ?? "")}`]),
+    ...payments.map((p) => [p.cardLast4 === "HAVALE" ? "Ödeme (havale/EFT)" : "Ödeme (kart •••• " + p.cardLast4 + ")", formatDateTime(p.at), `${formatTRY(p.amount)} — ${p.status === "SUCCESS" ? "Başarılı" : "Başarısız: " + (p.failReason ?? "")}`]),
     ...ledger.map((l) => [LEDGER_LABEL[l.kind] ?? l.kind, formatDateTime(l.at), formatTRY(l.amount)]),
   ], y + 6);
 

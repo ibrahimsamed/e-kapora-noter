@@ -5,7 +5,7 @@ import { Check, CheckCircle2, Copy, CreditCard, FileText, MessageCircle, RotateC
 import type { TxDetailData } from "@/lib/queries";
 import type { Role } from "@/lib/types";
 import { formatTRY } from "@/lib/format";
-import { DEMO_CARD_HINTS } from "@/lib/constants";
+import { BANK_INFO, DEMO_CARD_HINTS } from "@/lib/constants";
 import { Button, Card, CardHeader, Field, Input, Modal, Textarea } from "./ui";
 import { useAction } from "./use-action";
 import { useToast } from "./toast";
@@ -89,6 +89,8 @@ function PayModal({ open, onClose, data }: { open: boolean; onClose: () => void;
   const [f, setF] = useState({ number: "", name: "", exp: "", cvc: "" });
   const [res, setRes] = useState<{ ok: boolean; message: string } | null>(null);
   const [terms, setTerms] = useState(false);
+  const [method, setMethod] = useState<"card" | "transfer">("card");
+  const [copied, setCopied] = useState("");
   const lock = useRef(false);
   const { tx } = data;
   const total = tx.deposit + tx.buyerFee;
@@ -106,14 +108,54 @@ function PayModal({ open, onClose, data }: { open: boolean; onClose: () => void;
     else if (r.error) setRes({ ok: false, message: r.error });
   }
 
+  async function notify() {
+    if (lock.current || !terms) return;
+    lock.current = true;
+    const r = await run("tx.notifyTransfer", { txId: tx.id }, "Havale bildiriminiz alındı.");
+    lock.current = false;
+    if (r.ok) setRes({ ok: true, message: "Havale bildiriminiz alındı. Tutar hesabımıza ulaşıp onaylandığında işleminiz güvence altına alınacak." });
+    else if (r.error) setRes({ ok: false, message: r.error });
+  }
+  async function copy(text: string, key: string) {
+    try { await navigator.clipboard.writeText(text); setCopied(key); setTimeout(() => setCopied(""), 1500); } catch {}
+  }
+
   return (
     <Modal open={open} onClose={() => { setRes(null); onClose(); }} title="Güvenli Ödeme">
+      {!res?.ok && (
+        <div className="mb-4 grid grid-cols-2 gap-1 rounded-xl bg-surface p-1 text-sm font-semibold">
+          {([["card", "Kart ile öde"], ["transfer", "Havale / EFT"]] as const).map(([k, l]) => (
+            <button key={k} type="button" onClick={() => { setMethod(k); setRes(null); }}
+              className={method === k ? "rounded-lg bg-white py-2 text-navy shadow-sm" : "rounded-lg py-2 text-muted hover:text-ink"}>{l}</button>
+          ))}
+        </div>
+      )}
       {res?.ok ? (
         <div className="space-y-4 py-4 text-center">
           <CheckCircle2 className="mx-auto h-14 w-14 text-success" />
           <p className="font-semibold text-navy">{res.message}</p>
           <p className="text-sm text-muted">Kaporanız güvenli havuzda tutuluyor. İşlem iki taraf onayladığında tamamlanır.</p>
           <Button onClick={() => { setRes(null); onClose(); }}>Tamam</Button>
+        </div>
+      ) : method === "transfer" ? (
+        <div className="space-y-4">
+          <div className="space-y-2 rounded-xl bg-surface p-3 text-sm">
+            {([["Banka", BANK_INFO.bank, ""], ["Hesap sahibi", BANK_INFO.accountName, ""], ["IBAN", BANK_INFO.iban, "iban"], ["Açıklama (zorunlu)", tx.id, "ref"], ["Tutar", formatTRY(total), "amt"]] as const).map(([k, v, c]) => (
+              <div key={k} className="flex items-center justify-between gap-3">
+                <span className="text-muted">{k}</span>
+                <span className="flex items-center gap-2 text-right font-medium text-navy"><span className={c ? "font-mono" : ""}>{v}</span>
+                  {c && <button type="button" onClick={() => copy(c === "amt" ? String(total / 100).replace(".", ",") : v, c)} className="text-xs font-semibold text-brand">{copied === c ? "Kopyalandı" : "Kopyala"}</button>}
+                </span>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-muted">Havaleyi yaparken açıklama kısmına işlem numaranızı yazın. Tutar hesabımıza ulaşıp kontrol edildikten sonra işleminiz güvence altına alınır.</p>
+          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-line p-3 text-sm">
+            <input type="checkbox" className="mt-0.5 h-4 w-4" checked={terms} onChange={(e) => setTerms(e.target.checked)} />
+            <span><TermsLink onAccept={() => setTerms(true)}>Şartlar ve koşulları</TermsLink> okudum, kabul ediyorum.</span>
+          </label>
+          {res && !res.ok && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{res.message}</p>}
+          <Button size="lg" className="w-full" disabled={busy || !terms} onClick={notify}>{busy ? "Gönderiliyor…" : "Havaleyi yaptım"}</Button>
         </div>
       ) : (
         <form onSubmit={submit} className="space-y-4">
@@ -158,6 +200,10 @@ export function TxActions({ data, role }: { data: TxDetailData; role: Role }) {
   if (role === "CUSTOMER" && s === "WAITING_FOR_PAYMENT") {
     buttons.push(<Button key="pay" size="lg" onClick={() => setMode("pay")}><CreditCard className="h-5 w-5" /> Güvenli Öde</Button>);
   }
+  if (role === "ADMIN" && s === "PAYMENT_PROCESSING") {
+    buttons.push(<Button key="ta" variant="success" disabled={busy} onClick={() => run("tx.decideTransfer", { txId: tx.id, approve: true }, "Havale onaylandı; tutar güvence altına alındı.")}><Check className="h-4 w-4" /> Havaleyi onayla</Button>);
+    buttons.push(<Button key="tr" variant="outline" disabled={busy} onClick={() => run("tx.decideTransfer", { txId: tx.id, approve: false }, "Havale reddedildi; ödeme tekrar bekleniyor.")}><XCircle className="h-4 w-4" /> Havale ulaşmadı</Button>);
+  }
   if (s === "WAITING_FOR_PAYMENT") {
     buttons.push(<Button key="cu" variant="outline" onClick={() => setMode("cancelUnpaid")}><XCircle className="h-4 w-4" /> İşlemi iptal et</Button>);
   }
@@ -201,6 +247,7 @@ export function TxActions({ data, role }: { data: TxDetailData; role: Role }) {
   const hint =
     s === "CANCELLATION_REQUESTED" ? (role === "CUSTOMER" ? "İptal talebiniz satıcının yanıtını bekliyor." : "Müşteri iptal/iade talebi oluşturdu. Gerekçe: " + (tx.cancelRequest?.reason ?? "—")) :
     s === "WAITING_FOR_CONFIRMATION" ? (myConfirm ? "Onayınız alındı; karşı tarafın onayı bekleniyor." : "Karşı taraf onayladı; sizin onayınız bekleniyor.") :
+    s === "PAYMENT_PROCESSING" ? (role === "ADMIN" ? "Müşteri havale yaptığını bildirdi. Tutar hesaba ulaştıysa onaylayın." : "Havale bildirimi alındı; tutar kontrol edildikten sonra işlem güvence altına alınacak.") :
     s === "DISPUTED" ? "Uyuşmazlık admin incelemesinde. Otomatik sonuçlandırma yapılmaz." :
     s === "REFUND_PROCESSING" ? "İade süreci başlatıldı." : null;
 
