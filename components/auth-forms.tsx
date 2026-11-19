@@ -6,6 +6,7 @@ import { ArrowLeft, Smartphone, Lock, Mail } from "lucide-react";
 import { useInAuthModal } from "./auth-modal";
 import { Button, Field, Input, Logo, cn } from "./ui";
 import { postJson } from "./use-action";
+import { maskPhone } from "@/lib/format";
 
 function safeNext(v: string | null, fallback: string) {
   return v && v.startsWith("/") && !v.startsWith("//") ? v : fallback;
@@ -115,7 +116,7 @@ export function RegisterForm() {
           <Field label="Ad soyad"><Input value={f.name} onChange={set("name")} required /></Field>
           <Field label="İşletme / marka adı"><Input value={f.businessName} onChange={set("businessName")} required /></Field>
           <Field label="E-posta" hint="Doğrulama kodu bu adrese gönderilir."><Input type="email" autoComplete="username" value={f.email} onChange={set("email")} required /></Field>
-          <Field label="Cep telefonu" hint="Örn. 0532 123 45 67"><Input type="tel" value={f.phone} onChange={set("phone")} required /></Field>
+          <Field label="Cep telefonu" hint="Örn. 532 123 45 67"><Input type="tel" inputMode="numeric" placeholder="532 123 45 67" value={f.phone} onChange={(e) => setF((x) => ({ ...x, phone: maskPhone(e.target.value) }))} required /></Field>
           <Field label="Parola" hint="En az 8 karakter"><Input type="password" autoComplete="new-password" value={f.password} onChange={set("password")} minLength={8} required /></Field>
           {err && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{err}</p>}
           <Button type="submit" className="w-full" size="lg" disabled={busy}><Mail className="h-4 w-4" /> {busy ? "Kod gönderiliyor…" : "Doğrulama kodu gönder"}</Button>
@@ -170,7 +171,7 @@ export function CustomerLoginForm({ defaultTx = "" }: { defaultTx?: string }) {
       {step === 1 ? (
         <form onSubmit={request} className="space-y-4">
           <Field label={defaultTx ? "İşlem ID" : "İşlem ID (opsiyonel)"} hint={defaultTx ? "Bağlantıdan otomatik geldi; yalnızca telefon numaranızı girin." : "Satıcının paylaştığı ID, ör. EK-2026-000125"}><Input value={txId} onChange={(e) => setTxId(e.target.value)} placeholder="EK-2026-000125" readOnly={!!defaultTx} className={defaultTx ? "bg-surface font-mono" : undefined} /></Field>
-          <Field label="Cep telefonu"><Input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="0555 000 00 01" required /></Field>
+          <Field label="Cep telefonu"><Input type="tel" inputMode="numeric" value={phone} onChange={(e) => setPhone(maskPhone(e.target.value))} placeholder="555 000 00 01" required /></Field>
           {err && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{err}</p>}
           <Button type="submit" className="w-full" size="lg" disabled={busy}><Smartphone className="h-4 w-4" /> Doğrulama kodu gönder</Button>
         </form>

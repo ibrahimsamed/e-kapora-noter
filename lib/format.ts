@@ -46,11 +46,19 @@ export function formatDateTime(iso?: string): string {
   });
 }
 
-/** "5551234567" -> "0555 123 45 67" */
+/** "5551234567" -> "555 123 45 67" (başında 0 yok) */
 export function formatPhone(p: string): string {
   const d = p.replace(/\D/g, "");
   if (d.length !== 10) return p;
-  return `0${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6, 8)} ${d.slice(8)}`;
+  return `${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6, 8)} ${d.slice(8)}`;
+}
+
+/** Yazarken telefonu "545 345 99 34" biçimine sokar; baştaki 0 / 90 / +90 atılır. */
+export function maskPhone(input: string): string {
+  let d = input.replace(/\D/g, "");
+  if (d.startsWith("90") && d.length > 10) d = d.slice(2);
+  d = d.replace(/^0+/, "").slice(0, 10);
+  return [d.slice(0, 3), d.slice(3, 6), d.slice(6, 8), d.slice(8, 10)].filter(Boolean).join(" ");
 }
 
 /** Girdiyi 10 haneli ulusal numaraya çevirir; geçersizse null. */
@@ -77,9 +85,16 @@ export function maskMoney(input: string): string {
   return `${grouped || "0"},${dec}`;
 }
 
-/** "1.000.000,50" (TR biçimi) veya "1000.5" -> kuruş */
+/** "1.000.000,50" / "1.000" (TR biçimi) veya "1000.5" -> kuruş */
 export function tlToKurus(v: string | number): number {
-  const n = typeof v === "number" ? v : parseFloat(/,/.test(v) || /\..*\./.test(v) ? v.replace(/\./g, "").replace(",", ".") : v);
+  let n: number;
+  if (typeof v === "number") n = v;
+  else {
+    const t = v.trim();
+    // Virgül varsa ya da noktalar tam binlik grubuysa (1.000, 10.000.000) TR biçimi; aksi halde nokta ondalıktır.
+    const tr = t.includes(",") || /^\d{1,3}(\.\d{3})+$/.test(t);
+    n = parseFloat(tr ? t.replace(/\./g, "").replace(",", ".") : t);
+  }
   if (!isFinite(n)) return 0;
   return Math.round(n * 100);
 }

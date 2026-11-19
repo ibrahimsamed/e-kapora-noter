@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Activity, Clock, Lock, PiggyBank, PlusCircle, TrendingUp, Wallet } from "lucide-react";
+import { Activity, Clock, Lock, Coins, PlusCircle, TrendingUp, Wallet } from "lucide-react";
 import { requireRole } from "@/lib/session";
 import { readDb, rowsFor, sellerStats } from "@/lib/queries";
 import { formatNumber, formatTRY } from "@/lib/format";
@@ -23,7 +23,7 @@ export default async function Page() {
         <Stat label="Toplam İşlem Hacmi" value={formatTRY(st.volume)} icon={<TrendingUp className="h-5 w-5" />} tone="navy" />
         <Stat label="Güvence Altındaki Tutar" value={formatTRY(st.bal.secured)} icon={<Lock className="h-5 w-5" />} tone="success" hint={st.bal.pendingRefund ? `Bekleyen iade: ${formatTRY(st.bal.pendingRefund)}` : undefined} />
         <Stat label="Çekilebilir Bakiye" value={formatTRY(st.bal.available)} icon={<Wallet className="h-5 w-5" />} tone="success" />
-        <Stat label="Toplam Kazanç" value={formatTRY(st.bal.totalEarnings)} icon={<PiggyBank className="h-5 w-5" />} hint={`Ödenen komisyon: ${formatTRY(st.bal.totalCommission)}`} />
+        <Stat label="Toplam Kazanç" value={formatTRY(st.bal.totalEarnings)} icon={<Coins className="h-5 w-5" />} hint={`Ödenen komisyon: ${formatTRY(st.bal.totalCommission)}`} />
         <Stat label="Bekleyen İşlemler" value={formatNumber(st.pending)} icon={<Clock className="h-5 w-5" />} tone="amber" hint="Ödeme bekleyen" />
       </div>
       <div className="mb-6"><DashboardCharts d={st} /></div>

@@ -173,7 +173,7 @@ interface PendingSeller {
 export async function startRegistration(input: unknown): Promise<{ otpId: string; channel: OtpChannel; maskedTarget: string; expiresInSec: number }> {
   const p = registerSchema.parse(input);
   const phone = normalizePhone(p.phone);
-  if (!phone) fail("Geçerli bir cep telefonu girin (05xx xxx xx xx)");
+  if (!phone) fail("Geçerli bir cep telefonu girin (5xx xxx xx xx)");
   const db = await getDb();
   if (db.users.some((u) => u.email === p.email)) fail("Bu e-posta ile kayıtlı bir hesap var.", 409);
   if (db.users.some((u) => u.phone === phone && u.role !== "CUSTOMER"))
@@ -350,7 +350,7 @@ export async function resetPassword(token: string, password: string): Promise<vo
 
 export async function requestOtp(phoneRaw: string, txId?: string): Promise<{ phone: string; demoCode: string }> {
   const phone = normalizePhone(phoneRaw);
-  if (!phone) fail("Geçerli bir cep telefonu girin (05xx xxx xx xx)");
+  if (!phone) fail("Geçerli bir cep telefonu girin (5xx xxx xx xx)");
   const db = await getDb();
   const cust = db.users.find((u) => u.phone === phone && u.role === "CUSTOMER");
   if (!cust) fail("Bu telefon numarası ile eşleşen bir işlem bulunamadı.", 404);
@@ -553,6 +553,9 @@ export async function confirmTransaction(actor: Actor, txId: string) {
     activeUser(db, actor);
     if (tx.status !== "SECURED" && tx.status !== "WAITING_FOR_CONFIRMATION")
       fail("İşlem şu an onaylanabilir durumda değil.", 409);
+    // Ödeme alınıp güvenli havuza geçmeden hiçbir taraf onay veremez.
+    if (!db.payments.some((x) => x.txId === tx.id && x.status === "SUCCESS") || escrowHeld(db, tx.id) <= 0)
+      fail("Ödeme yapılmadan işlem onaylanamaz.", 409);
     const field = actor.role === "CUSTOMER" ? "buyerConfirmedAt" : "sellerConfirmedAt";
     if (tx[field]) fail("Bu işlemi zaten onayladınız.", 409);
     tx[field] = nowIso();

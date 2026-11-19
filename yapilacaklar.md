@@ -8,3 +8,8 @@ işlem oluşturup göndermeden önce şartları okudum onayladım kısmında şa
 müşteri tarafında da ödeme yapmadan önce koşulları kabul ediyorum kısmı koy ve tiklemeden ödemeyi alma.
 sistemde satıcı olan kişiye de müşteri şeklinde işlem açabilirim bu uyarıyı kaldır
 wp linki paylaşınca linke basınca otomatik olarak id ve dolu gelsin kişi sadece tel nosunu girsin
+tüm tel işlemlerde tel nosunun başında 0 olmasın şeklinde düzenle.
+ödeme yapmadan onaylama yapabiliyor.
+admin panel yapılacak
+genel bakıştaki toplam kazançtaki iconu değiştir.
+telefon numarasını girilen yerde aralara boşluk koy tel numarası formatı olsun örnek 545 345 99 34

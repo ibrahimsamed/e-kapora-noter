@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Banknote, Check, Gavel, Save, X } from "lucide-react";
 import type { PublicUser } from "@/lib/queries";
-import { formatTRY, tlToKurus, formatIban } from "@/lib/format";
+import { formatTRY, tlToKurus, formatIban, formatPhone } from "@/lib/format";
 import { Button, Card, CardHeader, Field, Input, Modal, Select, Textarea } from "./ui";
 import { useAction } from "./use-action";
 
@@ -20,7 +20,7 @@ export function ProfileForm({ user }: { user: PublicUser }) {
         <div className="grid gap-4 p-5 sm:grid-cols-2">
           <Field label="Ad soyad"><Input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} required /></Field>
           <Field label="E-posta"><Input type="email" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></Field>
-          <Field label="Telefon" hint="Telefon numarası değiştirilemez (doğrulama için kullanılır)."><Input value={user.phone} disabled /></Field>
+          <Field label="Telefon" hint="Telefon numarası değiştirilemez (doğrulama için kullanılır)."><Input value={formatPhone(user.phone)} disabled /></Field>
           {seller && <Field label="İşletme adı"><Input value={f.businessName} onChange={(e) => setF({ ...f, businessName: e.target.value })} /></Field>}
           {seller && <Field label="Şehir"><Input value={f.city} onChange={(e) => setF({ ...f, city: e.target.value })} /></Field>}
         </div>

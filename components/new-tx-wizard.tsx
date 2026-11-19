@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 import type { Category } from "@/lib/types";
 import { CANCEL_POLICIES, CATEGORIES, CATEGORY_LABEL } from "@/lib/workflow";
-import { formatPhone, formatTRY, maskMoney, normalizePhone, tlToKurus } from "@/lib/format";
+import { formatPhone, formatTRY, maskMoney, maskPhone, normalizePhone, tlToKurus } from "@/lib/format";
 import { Button, Card, Field, Input, KV, Select, Textarea, cn } from "./ui";
 import { useAction } from "./use-action";
 import { TermsLink } from "./terms";
@@ -34,7 +34,7 @@ export function NewTxWizard({ buyerFeeBps, sellerFeeBps }: { buyerFeeBps: number
     if (s === 0 && !f.category) return "Lütfen bir işlem türü seçin.";
     if (s === 1) {
       if (f.customerName.trim().length < 3) return "Müşteri adı soyadı gerekli.";
-      if (!normalizePhone(f.customerPhone)) return "Geçerli bir cep telefonu girin (05xx xxx xx xx).";
+      if (!normalizePhone(f.customerPhone)) return "Geçerli bir cep telefonu girin (5xx xxx xx xx).";
       if (f.customerEmail && !/^\S+@\S+\.\S+$/.test(f.customerEmail)) return "E-posta geçersiz.";
     }
     if (s === 2) {
@@ -109,7 +109,7 @@ export function NewTxWizard({ buyerFeeBps, sellerFeeBps }: { buyerFeeBps: number
           <div className="space-y-4">
             <h2 className="text-lg font-semibold text-navy">Müşteri bilgileri</h2>
             <Field label="Müşteri adı soyadı"><Input value={f.customerName} onChange={(e) => set("customerName", e.target.value)} /></Field>
-            <Field label="Telefon numarası" hint="Müşteri bu numara ile doğrulanır."><Input type="tel" value={f.customerPhone} onChange={(e) => set("customerPhone", e.target.value)} placeholder="0555 000 00 01" /></Field>
+            <Field label="Telefon numarası" hint="Müşteri bu numara ile doğrulanır."><Input type="tel" inputMode="numeric" value={f.customerPhone} onChange={(e) => set("customerPhone", maskPhone(e.target.value))} placeholder="555 000 00 01" /></Field>
             <Field label="E-posta (opsiyonel)"><Input type="email" value={f.customerEmail} onChange={(e) => set("customerEmail", e.target.value)} /></Field>
           </div>
         )}
