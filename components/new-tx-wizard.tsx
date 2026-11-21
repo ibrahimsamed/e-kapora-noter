@@ -161,7 +161,6 @@ export function NewTxWizard({ buyerFeeBps, sellerFeeBps }: { buyerFeeBps: number
                 <p className="text-xs font-semibold uppercase text-muted">Tutar özeti</p>
                 <dl className="divide-y divide-line">
                   <KV k="Ürün / hizmet bedeli" v={formatTRY(total)} />
-                  <KV k="Talep edilen kapora oranı" v={`%${total > 0 ? Math.round((deposit / total) * 10000) / 100 : 0}`.replace(".", ",")} />
                   <KV k="Talep edilen kapora" v={<b>{formatTRY(deposit)}</b>} />
                   <KV k="Net tutar (sistem ücreti düşülmüş)" v={<b className="text-success">{formatTRY(deposit - sellerFee)}</b>} />
                 </dl>

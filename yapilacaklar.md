@@ -1,13 +1,6 @@
-Giriş ekranı telefonda hoş durmuyor tam ekran kaplıyor
-
-Şifre inputuna şifre göster işareti
-Sistemden alınacak ücretin yerine işlem açana 
-Net tutar yaz istenen kaporanın % 2 sini düşüp göster
-
-İşlem sorgulamada id opsiyonel değil zorunlu olsun
-
-Güvenli ödeme kısmına haberle yapı da ekle
-
-Kart girme ekranında son kullana tarihinde inputs otomatik ay ve yılı ayır müşteri 1230 girerse 12/30 yap
-
-İşlemlerim kısmında sadece detaya basınca değil işlemmiş ye basınca da detayı aç
+hesap oluşturma kısmı telfondan açınca sığmıyor bundan dolayı aralardaki boşlukları ve zaten hesabınız var mıs kısmının üzerindeki divider kaldır kı hepsi sığsın. 
+satıcı hesabı oluştur dedikten sonrakie posta onaylama ekranı da biraz büyük kalıyor buradaki popup kısım sağdan sondan az boşluklu olsun 
+mail ona doğrulamada doğrulanıyor olarak kalıyor ama sayfayı yenileyince açılıyor burada bir hata var
+sayfa telefona yatayda tam sığmıyor ona göre ayarla telefonda %100 gözüksün 
+talep edilen kapora oranı bilgisi özet ksımından kaldır
+link wp ile yada kopyalıp gönderildiğinde işlem id kısmı link vasıtası ile dolsun

@@ -25,7 +25,7 @@ function Frame({ title, subtitle, children, foot }: { title: string; subtitle?: 
   return (
     <div
       className={cn(
-        "fixed inset-0 z-50 flex items-center justify-center overflow-y-auto px-4 py-6 sm:py-10",
+        "fixed inset-0 z-50 flex items-center justify-center overflow-y-auto px-3 py-3 sm:px-4 sm:py-10",
         inModal ? "bg-navy/30 backdrop-blur-md" : "bg-gradient-to-br from-navy via-navy-2 to-brand",
       )}
       onClick={close}
@@ -33,15 +33,15 @@ function Frame({ title, subtitle, children, foot }: { title: string; subtitle?: 
       aria-modal="true"
     >
       {!inModal && <div className="pointer-events-none absolute -right-32 -top-32 h-[480px] w-[480px] rounded-full bg-brand/40 blur-3xl" />}
-      <div className="relative w-full max-w-md my-auto max-h-[calc(100dvh-3rem)] overflow-y-auto rounded-2xl border border-white/40 bg-white/60 p-5 shadow-2xl ring-1 ring-white/30 backdrop-blur-2xl sm:max-h-none sm:rounded-3xl sm:p-8" onClick={(e) => e.stopPropagation()}>
-        <button type="button" onClick={close} className="mb-3 inline-flex items-center gap-1 rounded-lg text-sm font-semibold text-navy hover:text-brand">
+      <div className="relative w-full max-w-md my-auto max-h-[calc(100dvh-1.5rem)] overflow-y-auto rounded-2xl border border-white/40 bg-white/60 p-4 shadow-2xl ring-1 ring-white/30 backdrop-blur-2xl sm:max-h-none sm:rounded-3xl sm:p-8" onClick={(e) => e.stopPropagation()}>
+        <button type="button" onClick={close} className="mb-2 inline-flex items-center gap-1 rounded-lg text-sm font-semibold text-navy hover:text-brand">
           <ArrowLeft className="h-4 w-4" /> Geri
         </button>
         <Link href="/" className="mb-4 hidden justify-center sm:flex"><Logo className="text-xl" /></Link>
         <h1 className="text-xl font-bold text-navy">{title}</h1>
         {subtitle && <p className="mt-1 text-sm text-ink/70">{subtitle}</p>}
         <div className="mt-4 sm:mt-6">{children}</div>
-        {foot && <div className="mt-6 border-t border-white/60 pt-4 text-center text-sm text-ink/70">{foot}</div>}
+        {foot && <div className="mt-3 text-center text-sm text-ink/70 sm:mt-6 sm:border-t sm:border-white/60 sm:pt-4">{foot}</div>}
       </div>
     </div>
   );
@@ -106,6 +106,7 @@ export function RegisterForm() {
     setBusy(true); setErr("");
     const r = await postJson<{ home: string }>("/api/auth", { action: "register.verify", payload: { otpId: otp.otpId, code } });
     if (!r.ok) { setErr(r.error ?? "Doğrulama başarısız"); setBusy(false); return; }
+    setBusy(false);
     router.push(r.data?.home ?? "/panel");
     router.refresh();
   }
@@ -115,7 +116,7 @@ export function RegisterForm() {
   return (
     <Frame title="Satıcı hesabı oluştur" subtitle={step === 1 ? undefined : "E-postanıza gelen 6 haneli kodu girin."} foot={<>Zaten hesabınız var mı? <Link href="/giris" className="font-semibold text-brand">Giriş yapın</Link></>}>
       {step === 1 ? (
-        <form onSubmit={sendCode} className="space-y-3">
+        <form onSubmit={sendCode} className="space-y-2 sm:space-y-3">
           <Field label="Ad soyad"><Input value={f.name} onChange={set("name")} required /></Field>
           <Field label="İşletme / marka adı"><Input value={f.businessName} onChange={set("businessName")} required /></Field>
           <Field label="E-posta"><Input type="email" autoComplete="username" value={f.email} onChange={set("email")} required /></Field>
