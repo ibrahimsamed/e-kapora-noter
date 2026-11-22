@@ -12,7 +12,7 @@ import { TermsLink } from "./terms";
 const STEPS = ["İşlem türü", "Müşteri", "Detaylar", "Koşullar", "Komisyon ve onay"];
 const today = () => new Date().toISOString().slice(0, 10);
 
-export function NewTxWizard({ buyerFeeBps, sellerFeeBps }: { buyerFeeBps: number; sellerFeeBps: number }) {
+export function NewTxWizard({ sellerFeeBps }: { buyerFeeBps: number; sellerFeeBps: number }) {
   const router = useRouter();
   const { run, busy } = useAction();
   const [step, setStep] = useState(0);
@@ -27,7 +27,6 @@ export function NewTxWizard({ buyerFeeBps, sellerFeeBps }: { buyerFeeBps: number
 
   const total = tlToKurus(f.total);
   const deposit = tlToKurus(f.deposit);
-  const buyerFee = Math.round((deposit * buyerFeeBps) / 10000);
   const sellerFee = Math.round((deposit * sellerFeeBps) / 10000);
 
   function validate(s: number): string {

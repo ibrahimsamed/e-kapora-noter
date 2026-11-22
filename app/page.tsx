@@ -23,7 +23,7 @@ const audiences = [
 
 const features = [
   { icon: ShieldCheck, t: "Güvenli havuz (escrow) mantığı", d: "Kapora, işlem sonuçlanana kadar satıcıya aktarılmaz." },
-  { icon: Scale, t: "Uyuşmazlık yönetimi", d: "İtiraz halinde otomatik sonuçlandırma yok; kanıtlar admin tarafından incelenir." },
+  { icon: Scale, t: "Uyuşmazlık yönetimi", d: "Karşılıklı teklif, çift onaylı platform kararı ve itiraz hakkı; otomatik sonuçlandırma yok." },
   { icon: FileText, t: "PDF işlem belgesi", d: "Koşullar, onay tarihleri ve ödeme hareketleri tek belgede." },
   { icon: Wallet, t: "Net koşullar", d: "İptal, iade ve teslimat koşulları işlem öncesinde iki tarafa da açıkça gösterilir." },
   { icon: Bell, t: "Anlık durum takibi", d: "Zaman çizelgesiyle ödemenin ve onayların her adımını izleyin." },
@@ -140,7 +140,7 @@ export default function Landing() {
               {[
                 ["Ödeme önce güvence altına alınır", "Ödeme başarılı olduğunda işlem “Güvence Altında” durumuna geçer; ödeme olmadan güvence olmaz."],
                 ["İki taraflı onay", "Müşteri ve satıcı onayları ayrı tutulur. İkisi de onaylamadan tutar aktarılmaz."],
-                ["İtirazda insan incelemesi", "Uyuşmazlık açıldığında otomatik karar verilmez; kanıtlar admin tarafından değerlendirilir."],
+                ["İtirazda insan incelemesi", "Uyuşmazlık açıldığında otomatik karar verilmez; kanıtlar iki yetkili tarafından değerlendirilir ve itiraz hakkı tanınır."],
                 ["Tam izlenebilirlik", "Tüm durum değişiklikleri ve para hareketleri denetim kaydına ve finansal deftere işlenir."],
               ].map(([t, d]) => (
                 <li key={t} className="flex gap-3"><CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-success" /><div><p className="font-semibold text-navy">{t}</p><p className="text-sm text-muted">{d}</p></div></li>
@@ -227,7 +227,7 @@ export default function Landing() {
             </ul>
           </div>
           <p className="text-xs text-muted">
-            e-kapora noter bir noter veya finans kuruluşu değildir.
+            e-kapora noter, noterlik kurumu, banka veya finans kuruluşu değildir; resmî noter onayı sağlamaz. Uyuşmazlık kararları yalnızca havuzdaki tutarın dağıtımını belirler; tarafların yasal başvuru hakları (Tüketici Hakem Heyeti, arabuluculuk, mahkeme) saklıdır.
           </p>
         </div>
         <div className="border-t border-line py-4 text-center text-xs text-muted">© 2026 e-kapora noter</div>

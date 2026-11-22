@@ -79,6 +79,10 @@ export interface Transaction {
   cancelRequest?: { by: Role; reason: string; at: string };
   refund?: { amount: number; at: string; reason: string; by: ActorRole };
   closeReason?: string;
+  /** Mahkeme / icra / savcılık talebi nedeniyle havuzdaki para hareketi durdurulur. */
+  legalHold?: { reason: string; reference: string; at: string; adminId: string };
+  /** Ödeme anında kabul edilen şartların değiştirilemez kaydı (SHA-256). */
+  termsSnapshot?: { version: string; hash: string; at: string; content: string };
   events: TimelineEvent[];
   documents: { name: string; at: string; by: Role }[];
 }
@@ -127,20 +131,63 @@ export interface Withdrawal {
   adminNote?: string;
 }
 
+export type DisputeDecision = "REFUND_BUYER" | "PAY_SELLER" | "SPLIT";
+
+export interface DisputeEvidence {
+  name: string;
+  sizeKb: number;
+  by: Role;
+  at: string;
+  /** Depolama yolu (gerçek yüklemelerde); eski kayıtlarda yoktur. */
+  path?: string;
+  sha256?: string;
+  mime?: string;
+}
+
+export interface DisputeOffer {
+  id: string;
+  by: Role;
+  /** Müşteriye iade edilecek kapora oranı (baz puan; 10000 = %100). */
+  refundBps: number;
+  at: string;
+  status: "PENDING" | "ACCEPTED" | "REJECTED" | "WITHDRAWN";
+}
+
+export interface DisputeProposal {
+  decision: DisputeDecision;
+  refundBps: number;
+  note: string;
+  adminId: string;
+  at: string;
+}
+
+/**
+ * OPEN: müzakere/cevap süresi • UNDER_REVIEW: platform incelemesi • DECIDED: karar onaylandı, itiraz süresi işliyor
+ * APPEAL: itiraz edildi, ikinci inceleme • RESOLVED: para hareketi uygulandı
+ */
 export interface Dispute {
   id: string;
   txId: string;
   openedBy: Role;
   openedAt: string;
   reason: string;
-  status: "OPEN" | "UNDER_REVIEW" | "RESOLVED";
+  status: "OPEN" | "UNDER_REVIEW" | "DECIDED" | "APPEAL" | "RESOLVED";
+  respondBy?: string;
+  decideBy?: string;
+  appealUntil?: string;
   statements: { by: Role; userId: string; text: string; at: string }[];
-  evidence: { name: string; sizeKb: number; by: Role; at: string }[];
+  evidence: DisputeEvidence[];
+  offers?: DisputeOffer[];
+  proposal?: DisputeProposal;
+  approval?: { adminId: string; at: string; note: string };
+  appeal?: { by: Role; reason: string; at: string };
   resolution?: {
-    decision: "REFUND_BUYER" | "PAY_SELLER";
+    decision: DisputeDecision;
+    refundBps?: number;
     note: string;
     at: string;
-    adminId: string;
+    adminId?: string;
+    via?: "ADMIN" | "SETTLEMENT" | "APPEAL" | "AUTO";
   };
   reviewNotes: { text: string; at: string; adminId: string }[];
 }

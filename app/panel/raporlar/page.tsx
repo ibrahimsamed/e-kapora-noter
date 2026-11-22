@@ -13,6 +13,8 @@ export default async function Page() {
   return (
     <>
       <PageHeader title="Raporlar" subtitle="Komisyon ve gelir özetiniz. İşlem bazlı PDF için işlem detayını açın."
+        // CSV dosya indirmesi (sayfa gezinmesi değil)
+        // eslint-disable-next-line @next/next/no-html-link-for-pages
         action={<a href="/api/export" className="inline-flex items-center gap-2 rounded-xl border border-line bg-white px-4 py-2.5 text-sm font-semibold hover:bg-surface"><Download className="h-4 w-4" /> İşlemleri CSV indir</a>} />
       <div className="mb-6"><DashboardCharts d={st} /></div>
       <Card>

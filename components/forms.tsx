@@ -2,9 +2,11 @@
 import { useState } from "react";
 import { Banknote, Check, Gavel, Save, X } from "lucide-react";
 import type { PublicUser } from "@/lib/queries";
-import { formatTRY, tlToKurus, formatIban, formatPhone } from "@/lib/format";
+import type { Dispute } from "@/lib/types";
+import { formatTRY, tlToKurus, formatIban, formatPhone, formatDateTime } from "@/lib/format";
 import { Button, Card, CardHeader, Field, Input, Modal, Select, Textarea } from "./ui";
 import { useAction } from "./use-action";
+import { decisionText } from "@/lib/dispute-text";
 
 export function ProfileForm({ user }: { user: PublicUser }) {
   const { run, busy } = useAction();
@@ -138,38 +140,93 @@ export function UserToggle({ userId, active }: { userId: string; active: boolean
   );
 }
 
-export function DisputeResolve({ disputeId, held }: { disputeId: string; held: number }) {
+export function DisputeResolve({ dispute, held, adminId, legalHold }: { dispute: Dispute; held: number; adminId: string; legalHold: boolean }) {
   const { run, busy } = useAction();
-  const [decision, setDecision] = useState<"REFUND_BUYER" | "PAY_SELLER" | "MORE_REVIEW">("MORE_REVIEW");
+  const [decision, setDecision] = useState<"REFUND_BUYER" | "PAY_SELLER" | "SPLIT" | "MORE_REVIEW">("MORE_REVIEW");
+  const [pct, setPct] = useState("50");
   const [note, setNote] = useState("");
   const [confirm, setConfirm] = useState(false);
-  const labels = { REFUND_BUYER: "Müşteriye iade", PAY_SELLER: "Satıcıya aktar", MORE_REVIEW: "Ek inceleme" };
-  return (
-    <Card>
-      <CardHeader title="Admin kararı" subtitle={`Güvenceye alınan tutar: ${formatTRY(held)}`} />
+  const labels = { REFUND_BUYER: "Müşteriye tam iade", PAY_SELLER: "Satıcıya aktar", SPLIT: "Oranlı dağıtım", MORE_REVIEW: "Ek inceleme" };
+  const isAppeal = dispute.status === "APPEAL";
+  const proposal = dispute.proposal;
+  const mineProposal = proposal?.adminId === adminId;
+
+  if (dispute.status === "DECIDED")
+    return (
+      <Card><CardHeader title="Karar onaylandı" subtitle="İtiraz süresi işliyor" /><div className="space-y-1 p-5 text-sm">
+        <p><b>{proposal ? decisionText(proposal.refundBps) : "—"}</b> — {proposal?.note}</p>
+        <p className="text-muted">İtiraz yoksa {formatDateTime(dispute.appealUntil)} sonrasında bir sonraki sayfa yüklemesinde otomatik uygulanır{legalHold ? " (hukuki blokaj kalkana kadar bekler)" : ""}.</p>
+      </div></Card>
+    );
+
+  // Başka bir yönetici öneri yaptıysa: onay / iade
+  if (!isAppeal && proposal && !mineProposal)
+    return <ApproveBox dispute={dispute} />;
+  if (!isAppeal && proposal && mineProposal)
+    return (
+      <Card><CardHeader title="Onay bekleniyor" subtitle="Çift onay: ikinci bir yönetici önerinizi onaylamalı" /><div className="p-5 text-sm">
+        <p><b>{decisionText(proposal.refundBps)}</b> — {proposal.note}</p>
+        <p className="mt-1 text-muted">Önerinizi değiştirmek için aşağıdan yeni karar kaydedebilirsiniz.</p>
+      </div>{form()}</Card>
+    );
+  return <Card><CardHeader title={isAppeal ? "İtiraz incelemesi (nihai karar)" : "Karar önerisi"} subtitle={`Güvenceye alınan tutar: ${formatTRY(held)}`} />{isAppeal && dispute.appeal && <p className="mx-5 mt-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-900"><b>İtiraz ({dispute.appeal.by === "CUSTOMER" ? "Müşteri" : "Satıcı"}):</b> {dispute.appeal.reason}</p>}{form()}</Card>;
+
+  function form() {
+    const bps = decision === "REFUND_BUYER" ? 10000 : decision === "PAY_SELLER" ? 0 : Number(pct) * 100;
+    const bad = decision === "SPLIT" && (pct === "" || Number(pct) < 1 || Number(pct) > 99);
+    return (
       <div className="space-y-4 p-5">
-        <div className="grid gap-2 sm:grid-cols-3">
+        {legalHold && <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">Bu işlemde hukuki blokaj var; karar kaydedilemez.</p>}
+        <div className="grid gap-2 sm:grid-cols-4">
           {(Object.keys(labels) as (keyof typeof labels)[]).map((k) => (
             <button key={k} type="button" onClick={() => setDecision(k)}
               className={`rounded-xl border p-3 text-sm font-semibold ${decision === k ? "border-brand bg-brand-soft text-brand" : "border-line hover:bg-surface"}`}>{labels[k]}</button>
           ))}
         </div>
-        <Field label="Karar notu (taraflara ve kayıtlara işlenir)"><Textarea value={note} onChange={(e) => setNote(e.target.value)} /></Field>
-        <Button disabled={busy || note.trim().length < 5} onClick={() => (decision === "MORE_REVIEW" ? submit() : setConfirm(true))}><Gavel className="h-4 w-4" /> Kararı uygula</Button>
+        {decision === "SPLIT" && (
+          <Field label="Müşteriye iade edilecek kapora oranı (%1–%99)" hint="Kalan pay satıcıya aktarılır; komisyonlar yalnızca satıcıya aktarılan pay oranında kesilir.">
+            <Input className="w-32" inputMode="numeric" value={pct} onChange={(e) => setPct(e.target.value.replace(/\D/g, "").slice(0, 2))} />
+          </Field>
+        )}
+        <Field label="Karar gerekçesi (taraflara ve kayıtlara işlenir)"><Textarea value={note} onChange={(e) => setNote(e.target.value)} /></Field>
+        <Button disabled={busy || bad || (legalHold && decision !== "MORE_REVIEW") || note.trim().length < 5} onClick={() => (decision === "MORE_REVIEW" ? submit(bps) : setConfirm(true))}>
+          <Gavel className="h-4 w-4" /> {isAppeal ? "Nihai kararı uygula" : decision === "MORE_REVIEW" ? "Notu kaydet" : "Öneriyi kaydet"}
+        </Button>
+        <Modal open={confirm} onClose={() => setConfirm(false)} title="Kararı onaylıyor musunuz?">
+          <p className="mb-4 text-sm text-muted">
+            {isAppeal ? `“${decisionText(bps)}” nihai karar olarak hemen uygulanacak ve para hareketi gerçekleşecek.` : `“${decisionText(bps)}” önerisi kaydedilecek. İkinci yönetici onayından ve itiraz süresinden sonra uygulanır (tek yönetici varsa itiraz süresi hemen başlar).`}
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setConfirm(false)}>Vazgeç</Button>
+            <Button disabled={busy} onClick={() => submit(bps)}>Evet</Button>
+          </div>
+        </Modal>
       </div>
-      <Modal open={confirm} onClose={() => setConfirm(false)} title="Kararı onaylıyor musunuz?">
-        <p className="mb-4 text-sm text-muted">“{labels[decision]}” kararı uygulanacak ve para hareketi gerçekleşecek. Bu işlem geri alınamaz.</p>
-        <div className="flex justify-end gap-2">
-          <Button variant="outline" onClick={() => setConfirm(false)}>Vazgeç</Button>
-          <Button disabled={busy} onClick={submit}>Evet, uygula</Button>
-        </div>
-      </Modal>
-    </Card>
-  );
-  async function submit() {
-    const r = await run("dispute.resolve", { disputeId, decision, note }, decision === "MORE_REVIEW" ? "Ek inceleme notu kaydedildi." : "Uyuşmazlık sonuçlandırıldı.");
+    );
+  }
+  async function submit(bps: number) {
+    const r = await run("dispute.resolve", { disputeId: dispute.id, decision, refundBps: bps, note }, decision === "MORE_REVIEW" ? "İnceleme notu kaydedildi." : isAppeal ? "Nihai karar uygulandı." : "Karar önerisi kaydedildi.");
     if (r.ok) { setConfirm(false); setNote(""); }
   }
+}
+
+function ApproveBox({ dispute }: { dispute: Dispute }) {
+  const { run, busy } = useAction();
+  const [note, setNote] = useState("");
+  const p = dispute.proposal!;
+  return (
+    <Card>
+      <CardHeader title="Karar önerisi onayınızı bekliyor" subtitle="Çift onay: öneriyi yapan yönetici onaylayamaz" />
+      <div className="space-y-4 p-5 text-sm">
+        <p className="rounded-xl bg-surface p-3"><b>{decisionText(p.refundBps)}</b> — {p.note}</p>
+        <Field label="Onay / iade notu"><Textarea value={note} onChange={(e) => setNote(e.target.value)} /></Field>
+        <div className="flex gap-2">
+          <Button disabled={busy || note.trim().length < 5} onClick={() => run("dispute.approve", { disputeId: dispute.id, approve: true, note }, "Karar onaylandı; itiraz süresi başladı.")}>Onayla</Button>
+          <Button variant="outline" disabled={busy || note.trim().length < 5} onClick={() => run("dispute.approve", { disputeId: dispute.id, approve: false, note }, "Öneri iade edildi.")}>Gerekçeyle iade et</Button>
+        </div>
+      </div>
+    </Card>
+  );
 }
 
 export function SettingsForm({ buyerFeeBps, sellerFeeBps, minWithdrawal }: { buyerFeeBps: number; sellerFeeBps: number; minWithdrawal: number }) {

@@ -8,11 +8,16 @@ import { nowIso, now } from "./clock";
 import { canTransition, STATUS_META } from "./workflow";
 import { escrowHeld, sellerBalances } from "./balances";
 import { normalizePhone } from "./format";
+import { TERMS_SECTIONS, TERMS_VERSION } from "./terms-text";
 import type {
   Actor,
   ActorRole,
   Db,
+  Dispute,
+  DisputeDecision,
+  DisputeEvidence,
   LedgerKind,
+  Role,
   Transaction,
   TxStatus,
   User,
@@ -119,11 +124,34 @@ function isExpired(tx: Transaction) {
   return tx.status === "WAITING_FOR_PAYMENT" && new Date(tx.validUntil).getTime() < now().getTime();
 }
 
+/** Ödeme anındaki şartları ve işlem bilgilerini SHA-256 özetiyle bir kez kaydeder (sonradan değiştirilemez). */
+function snapshotTerms(tx: Transaction) {
+  if (tx.termsSnapshot) return;
+  const content = JSON.stringify({
+    version: TERMS_VERSION,
+    terms: TERMS_SECTIONS,
+    tx: {
+      id: tx.id, sellerId: tx.sellerId, customerId: tx.customerId, category: tx.category, title: tx.title,
+      description: tx.description, totalAmount: tx.totalAmount, deposit: tx.deposit, buyerFee: tx.buyerFee,
+      sellerFee: tx.sellerFee, serviceDate: tx.serviceDate, validUntil: tx.validUntil, cancelPolicy: tx.cancelPolicy,
+      refundPolicy: tx.refundPolicy, deliveryTerms: tx.deliveryTerms, extraNotes: tx.extraNotes,
+    },
+  });
+  tx.termsSnapshot = { version: TERMS_VERSION, hash: createHash("sha256").update(content).digest("hex"), at: nowIso(), content };
+}
+
 /* ------------------------------------------------------------------ expiry */
 
+const dueDecision = (d: Dispute, tx?: Transaction) =>
+  d.status === "DECIDED" && !!d.appealUntil && new Date(d.appealUntil).getTime() < now().getTime() && !tx?.legalHold;
+
+/** Süresi dolan işlemleri kapatır ve itiraz süresi dolan uyuşmazlık kararlarını uygular. */
 export async function sweepExpired() {
   const db = await getDb();
-  if (!db.transactions.some(isExpired)) return;
+  const txOf = (id: string) => db.transactions.find((t) => t.id === id);
+  const hasDue = db.disputes.some((d) => dueDecision(d, txOf(d.txId)));
+  if (!db.transactions.some(isExpired) && !hasDue) return;
+  const applied: string[] = [];
   await mutate((d) => {
     for (const tx of d.transactions) {
       if (isExpired(tx)) {
@@ -131,7 +159,22 @@ export async function sweepExpired() {
         transition(d, tx, "EXPIRED", SYSTEM, "İşlem geçerlilik süresi doldu");
       }
     }
+    for (const dd of d.disputes) {
+      const tx = d.transactions.find((t) => t.id === dd.txId);
+      if (!tx || !dueDecision(dd, tx) || !dd.proposal) continue;
+      // Bir uyuşmazlığın uygulanamaması (ör. tutarsız havuz) tüm sayfa okumalarını bozmamalı.
+      const snap = structuredClone({ tx, dd, ledger: d.ledger.length });
+      try {
+        finalizeDispute(d, tx, dd, SYSTEM, "AUTO", dd.approval?.note ?? dd.proposal.note);
+        applied.push(dd.id);
+      } catch {
+        d.ledger.length = snap.ledger;
+        Object.assign(tx, snap.tx);
+        Object.assign(dd, snap.dd);
+      }
+    }
   });
+  for (const id of applied) await notifyDispute(id, "Uyuşmazlık kararı uygulandı", "İtiraz süresi dolduğu için karar uygulandı.");
 }
 
 /* ------------------------------------------------------------------ auth */
@@ -520,6 +563,7 @@ export async function payTransaction(actor: Actor, input: unknown): Promise<{ ok
     }
     ledger(db, tx, "PAYMENT", amount, `Ödeme •••• ${last4} (kapora + alıcı komisyonu)`);
     tx.securedAt = nowIso();
+    snapshotTerms(tx);
     transition(db, tx, "SECURED", SYSTEM, "Ödeme güvence altına alındı");
     return { ok: true, message: "Ödemeniz başarıyla alındı ve güvence altına alındı." };
   });
@@ -566,12 +610,18 @@ export async function decideTransfer(actor: Actor, input: { txId: string; approv
     });
     ledger(db, tx, "PAYMENT", amount, "Havale/EFT ödemesi (kapora + alıcı komisyonu)");
     tx.securedAt = nowIso();
+    snapshotTerms(tx);
     transition(db, tx, "SECURED", actor, "Havale onaylandı; ödeme güvence altına alındı");
     return { status: tx.status };
   });
 }
 
+function assertNoHold(tx: Transaction) {
+  if (tx.legalHold) fail(`İşlem üzerinde hukuki blokaj var (${tx.legalHold.reference}); para hareketi yapılamaz.`, 423);
+}
+
 function releaseToSeller(db: Db, tx: Transaction, actor: AnyActor, label: string) {
+  assertNoHold(tx);
   const held = escrowHeld(db, tx.id);
   const expected = tx.deposit + tx.buyerFee;
   if (held !== expected) fail("Güvenli havuz bakiyesi tutarsız; işlem sonuçlandırılamaz.", 409);
@@ -582,6 +632,7 @@ function releaseToSeller(db: Db, tx: Transaction, actor: AnyActor, label: string
 }
 
 function refundBuyer(db: Db, tx: Transaction, actor: AnyActor, reason: string, label: string) {
+  assertNoHold(tx);
   if (db.ledger.some((l) => l.txId === tx.id && l.kind === "REFUND")) fail("Bu işlemde iade zaten yapılmış.", 409);
   const held = escrowHeld(db, tx.id);
   if (held <= 0) fail("İade edilecek güvence altında tutar yok.", 409);
@@ -675,90 +726,379 @@ export async function processRefund(actor: Actor, txId: string) {
 
 /* ------------------------------------------------------------------ disputes */
 
-function evidenceSize(name: string) {
-  let h = 0;
-  for (const c of name) h = (h * 31 + c.charCodeAt(0)) % 4000;
-  return 120 + h;
+/** Süreç süreleri (rapor 3.2). Resmî tatiller hesaba katılmaz; yalnızca hafta sonları atlanır. */
+const RESPOND_HOURS = 72;
+const DECIDE_BUSINESS_DAYS = 7;
+const APPEAL_BUSINESS_DAYS = 5;
+const APPEAL_DAYS = 3;
+
+function addBusinessDays(from: Date, n: number) {
+  const d = new Date(from);
+  let left = n;
+  while (left > 0) {
+    d.setDate(d.getDate() + 1);
+    const w = d.getDay();
+    if (w !== 0 && w !== 6) left--;
+  }
+  return d;
 }
 
-export async function openDispute(actor: Actor, input: { txId: string; reason: string; evidenceName?: string }) {
+const evidenceInput = z.object({
+  name: z.string().trim().min(1).max(120),
+  path: z.string().min(3).max(300),
+  sha256: z.string().regex(/^[0-9a-f]{64}$/),
+  sizeKb: z.number().int().min(0).max(100000),
+  mime: z.string().max(100),
+});
+
+function addEvidence(tx: Transaction, bucket: DisputeEvidence[], raw: unknown, by: Role, at: string) {
+  if (!raw) return;
+  const e = evidenceInput.parse(raw);
+  if (!e.path.startsWith(`${tx.id}/`) || e.path.includes("..")) fail("Geçersiz kanıt dosyası.");
+  bucket.push({ ...e, by, at });
+  tx.documents.push({ name: e.name, at, by });
+}
+
+const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] as string);
+
+/** Bildirim (SMS / e-posta): en iyi çaba; hata işlemi asla bozmaz. */
+async function notifyDispute(disputeId: string, subject: string, text: string, who: Role[] = ["CUSTOMER", "SELLER"]) {
+  try {
+    const db = await getDb();
+    const d = db.disputes.find((x) => x.id === disputeId);
+    const tx = d && db.transactions.find((t) => t.id === d.txId);
+    if (!d || !tx) return;
+    const users = db.users.filter(
+      (u) =>
+        u.active &&
+        ((who.includes("CUSTOMER") && u.id === tx.customerId) ||
+          (who.includes("SELLER") && u.id === tx.sellerId) ||
+          (who.includes("ADMIN") && u.role === "ADMIN")),
+    );
+    const body = `${text}\nİşlem: ${tx.id} • Uyuşmazlık: ${d.id}\n${appUrl()}`;
+    const jobs: Promise<void>[] = [];
+    for (const u of users) {
+      if (u.notif.sms && u.phone) jobs.push(sendSms(u.phone, `e-kapora noter: ${subject}. ${text} (İşlem ${tx.id})`));
+      if (u.notif.email && u.email)
+        jobs.push(sendMail({ to: u.email, subject: `e-kapora noter — ${subject}`, text: body, html: `<p>${esc(body).replace(/\n/g, "<br>")}</p>` }));
+    }
+    await Promise.allSettled(jobs);
+  } catch {
+    /* bildirim başarısızlığı yok sayılır */
+  }
+}
+
+const decisionOf = (bps: number): DisputeDecision => (bps >= 10000 ? "REFUND_BUYER" : bps <= 0 ? "PAY_SELLER" : "SPLIT");
+const bpsOf = (decision: DisputeDecision, refundBps?: number) =>
+  decision === "REFUND_BUYER" ? 10000 : decision === "PAY_SELLER" ? 0 : z.number().int().min(1, "Oran %0–%100 arasında olmalı").max(9999, "Kısmi oran %100'den küçük olmalı").parse(refundBps);
+const decisionText = (bps: number) =>
+  bps >= 10000 ? "müşteriye tam iade" : bps <= 0 ? "satıcıya aktarım" : `kaporanın %${bps / 100}'i müşteriye iade, kalanı satıcıya`;
+
+const activeAdmins = (db: Db) => db.users.filter((u) => u.role === "ADMIN" && u.active);
+
+/** Çift onay: aynı yönetici birden fazla aşamada karar veremez (başka yönetici varsa). */
+function assertDistinctAdmin(db: Db, actor: Actor, used: (string | undefined)[]) {
+  const others = activeAdmins(db).filter((u) => !used.includes(u.id));
+  if (used.includes(actor.id) && others.length > 0)
+    fail("Çift onay kuralı: bu aşamada daha önce işlem yapmamış bir yönetici gerekir.", 403);
+}
+
+/**
+ * Havuzdaki parayı müşteri / satıcı / platform arasında dağıtır.
+ * refundBps: kaporanın müşteriye iade edilecek oranı (10000 = tam iade, 0 = tam aktarım). Alıcı ve satıcı komisyonu,
+ * yalnızca satıcıya aktarılan pay oranında kesilir; iade edilen payın komisyonu müşteriye geri döner.
+ */
+function distribute(db: Db, tx: Transaction, refundBps: number, actor: AnyActor, label: string, reason: string) {
+  assertNoHold(tx);
+  if (refundBps >= 10000) return refundBuyer(db, tx, actor, reason, label);
+  if (refundBps <= 0) return releaseToSeller(db, tx, actor, label);
+  if (escrowHeld(db, tx.id) !== tx.deposit + tx.buyerFee) fail("Güvenli havuz bakiyesi tutarsız; işlem sonuçlandırılamaz.", 409);
+  const refundDeposit = Math.round((tx.deposit * refundBps) / 10000);
+  const sellerShare = tx.deposit - refundDeposit;
+  const sellerFeeApplied = Math.round((tx.sellerFee * sellerShare) / tx.deposit);
+  const buyerFeeApplied = Math.round((tx.buyerFee * sellerShare) / tx.deposit);
+  const buyerRefund = refundDeposit + (tx.buyerFee - buyerFeeApplied);
+  const sellerNet = sellerShare - sellerFeeApplied;
+  const commission = buyerFeeApplied + sellerFeeApplied;
+  const pct = refundBps / 100;
+  if (buyerRefund > 0) ledger(db, tx, "REFUND", buyerRefund, `Kısmi iade (%${pct}) — ${reason}`);
+  if (sellerNet > 0) ledger(db, tx, "RELEASE_SELLER", sellerNet, `Satıcıya kısmi aktarım (%${100 - pct}) — komisyon düşülmüş`);
+  if (commission > 0) ledger(db, tx, "COMMISSION", commission, "Platform komisyonu (aktarılan pay oranında)");
+  tx.refund = { amount: buyerRefund, at: nowIso(), reason, by: actor.role };
+  tx.completedAt = nowIso();
+  transition(db, tx, "COMPLETED", actor, label);
+}
+
+function finalizeDispute(
+  db: Db,
+  tx: Transaction,
+  dd: Dispute,
+  actor: AnyActor,
+  via: NonNullable<Dispute["resolution"]>["via"],
+  note: string,
+  override?: { refundBps: number },
+) {
+  const bps = override?.refundBps ?? dd.proposal?.refundBps;
+  if (bps === undefined) fail("Uygulanacak karar yok.", 409);
+  const b = bps as number;
+  distribute(db, tx, b, actor, `Uyuşmazlık kararı uygulandı: ${decisionText(b)}`, `Uyuşmazlık kararı: ${note}`);
+  dd.status = "RESOLVED";
+  dd.appealUntil = undefined;
+  dd.resolution = { decision: decisionOf(b), refundBps: b, note, at: nowIso(), adminId: actor.role === "ADMIN" ? actor.id : dd.approval?.adminId, via };
+  audit(db, actor, "DISPUTE_RESOLVE", dd.id, `${via}: ${decisionText(b)} — ${note}`);
+}
+
+function approveInternal(db: Db, dd: Dispute, actor: AnyActor, note: string) {
+  dd.approval = { adminId: actor.id, at: nowIso(), note };
+  dd.status = "DECIDED";
+  dd.appealUntil = new Date(now().getTime() + APPEAL_DAYS * 86400000).toISOString();
+  audit(db, actor, "DISPUTE_APPROVE", dd.id, note);
+}
+
+export async function openDispute(actor: Actor, input: { txId: string; reason: string; evidence?: unknown }) {
   if (actor.role === "ADMIN") fail("Uyuşmazlığı taraflar açar.", 403);
   const reason = z.string().trim().min(10, "Gerekçe en az 10 karakter olmalı").max(1000).parse(input.reason);
-  return await mutate((db) => {
+  const res = await mutate((db) => {
     const tx = getTx(db, input.txId);
     assertAccess(tx, actor);
     if (db.disputes.some((d) => d.txId === tx.id && d.status !== "RESOLVED")) fail("Bu işlemde zaten açık bir uyuşmazlık var.", 409);
     transition(db, tx, "DISPUTED", actor, `${actor.role === "CUSTOMER" ? "Müşteri" : "Satıcı"} uyuşmazlık bildirdi`, reason);
     const at = nowIso();
-    const d = {
+    const d: Dispute = {
       id: nextId(db, "DSP"),
       txId: tx.id,
       openedBy: actor.role,
       openedAt: at,
       reason,
-      status: "OPEN" as const,
+      status: "OPEN",
+      respondBy: new Date(now().getTime() + RESPOND_HOURS * 3600000).toISOString(),
+      decideBy: addBusinessDays(now(), DECIDE_BUSINESS_DAYS).toISOString(),
       statements: [{ by: actor.role, userId: actor.id, text: reason, at }],
-      evidence: [] as Db["disputes"][number]["evidence"],
+      evidence: [],
+      offers: [],
       reviewNotes: [],
     };
-    if (input.evidenceName?.trim()) {
-      const name = input.evidenceName.trim().slice(0, 120);
-      d.evidence.push({ name, sizeKb: evidenceSize(name), by: actor.role, at });
-      tx.documents.push({ name, at, by: actor.role });
-    }
+    addEvidence(tx, d.evidence, input.evidence, actor.role, at);
     db.disputes.push(d);
     audit(db, actor, "DISPUTE_OPEN", d.id, reason);
     return { disputeId: d.id };
   });
+  await notifyDispute(res.disputeId, "Uyuşmazlık bildirildi", `Karşı taraf uyuşmazlık bildirdi. ${RESPOND_HOURS} saat içinde yanıt vermeniz beklenir.`);
+  await notifyDispute(res.disputeId, "Yeni uyuşmazlık", "İncelenmeyi bekleyen yeni bir uyuşmazlık var.", ["ADMIN"]);
+  return res;
 }
 
-export async function addDisputeStatement(actor: Actor, input: { disputeId: string; text: string; evidenceName?: string }) {
+export async function addDisputeStatement(actor: Actor, input: { disputeId: string; text: string; evidence?: unknown }) {
   if (actor.role === "ADMIN") fail("Yalnızca taraflar açıklama ekleyebilir.", 403);
   const text = z.string().trim().min(5, "Açıklama en az 5 karakter olmalı").max(1000).parse(input.text);
-  return await mutate((db) => {
+  const res = await mutate((db) => {
     const d = db.disputes.find((x) => x.id === input.disputeId);
     if (!d) fail("Uyuşmazlık bulunamadı", 404);
-    const dd = d as Db["disputes"][number];
+    const dd = d as Dispute;
     const tx = getTx(db, dd.txId);
     assertAccess(tx, actor);
     if (dd.status === "RESOLVED") fail("Sonuçlanmış uyuşmazlığa ekleme yapılamaz.", 409);
     const at = nowIso();
     dd.statements.push({ by: actor.role, userId: actor.id, text, at });
-    if (input.evidenceName?.trim()) {
-      const name = input.evidenceName.trim().slice(0, 120);
-      dd.evidence.push({ name, sizeKb: evidenceSize(name), by: actor.role, at });
-      tx.documents.push({ name, at, by: actor.role });
-    }
+    addEvidence(tx, dd.evidence, input.evidence, actor.role, at);
     audit(db, actor, "DISPUTE_STATEMENT", dd.id, "Açıklama/kanıt eklendi");
+    return { ok: true };
+  });
+  await notifyDispute(input.disputeId, "Uyuşmazlığa yeni açıklama", "Karşı taraf uyuşmazlığa açıklama/kanıt ekledi.");
+  return res;
+}
+
+/** Taraflar: karşılıklı iade oranı teklifi (müzakere). */
+export async function makeDisputeOffer(actor: Actor, input: { disputeId: string; refundBps: number }) {
+  if (actor.role === "ADMIN") fail("Yalnızca taraflar teklif verebilir.", 403);
+  const bps = z.number().int().min(0, "Oran %0–%100 arasında olmalı").max(10000, "Oran %0–%100 arasında olmalı").parse(input.refundBps);
+  const res = await mutate((db) => {
+    const dd = db.disputes.find((x) => x.id === input.disputeId);
+    if (!dd) fail("Uyuşmazlık bulunamadı", 404);
+    const d = dd as Dispute;
+    assertAccess(getTx(db, d.txId), actor);
+    if (d.status === "RESOLVED") fail("Sonuçlanmış uyuşmazlıkta teklif verilemez.", 409);
+    d.offers = d.offers ?? [];
+    for (const o of d.offers) if (o.by === actor.role && o.status === "PENDING") o.status = "WITHDRAWN";
+    d.offers.push({ id: nextId(db, "OFR"), by: actor.role, refundBps: bps, at: nowIso(), status: "PENDING" });
+    audit(db, actor, "DISPUTE_OFFER", d.id, `Teklif: ${decisionText(bps)}`);
+    return { ok: true };
+  });
+  await notifyDispute(input.disputeId, "Uyuşmazlıkta yeni teklif", `Karşı taraf bir çözüm teklif etti: ${decisionText(bps)}.`);
+  return res;
+}
+
+/** Teklif kabul edilirse tutar anında kabul edilen orana göre dağıtılır (platform kararı gerekmez). */
+export async function respondDisputeOffer(actor: Actor, input: { disputeId: string; offerId: string; accept: boolean }) {
+  if (actor.role === "ADMIN") fail("Yalnızca taraflar teklife yanıt verebilir.", 403);
+  const res = await mutate((db) => {
+    const dd = db.disputes.find((x) => x.id === input.disputeId);
+    if (!dd) fail("Uyuşmazlık bulunamadı", 404);
+    const d = dd as Dispute;
+    const tx = getTx(db, d.txId);
+    assertAccess(tx, actor);
+    if (d.status === "RESOLVED") fail("Uyuşmazlık zaten sonuçlanmış.", 409);
+    const offer = (d.offers ?? []).find((o) => o.id === input.offerId);
+    if (!offer || offer.status !== "PENDING") fail("Teklif bulunamadı veya geçerli değil.", 404);
+    const o = offer as NonNullable<typeof offer>;
+    if (o.by === actor.role) fail("Kendi teklifinizi kabul/reddedemezsiniz.", 403);
+    if (!input.accept) {
+      o.status = "REJECTED";
+      audit(db, actor, "DISPUTE_OFFER_REJECT", d.id, o.id);
+      return { settled: false };
+    }
+    o.status = "ACCEPTED";
+    for (const x of d.offers ?? []) if (x.status === "PENDING") x.status = "WITHDRAWN";
+    finalizeDispute(db, tx, d, SYSTEM, "SETTLEMENT", `Taraflar anlaştı: ${decisionText(o.refundBps)}`, { refundBps: o.refundBps });
+    return { settled: true };
+  });
+  await notifyDispute(
+    input.disputeId,
+    res.settled ? "Uyuşmazlık anlaşmayla sonuçlandı" : "Teklif reddedildi",
+    res.settled ? "Taraflar anlaştı; tutar kabul edilen orana göre dağıtıldı." : "Karşı taraf teklifinizi reddetti.",
+  );
+  return res;
+}
+
+/**
+ * Yönetici: karar önerisi / ek inceleme / itiraz sonrası nihai karar.
+ * Çift onay: öneri, başka bir yönetici onaylayınca (approveDispute) "DECIDED" olur; tek yönetici varsa otomatik onaylanır.
+ */
+export async function resolveDispute(
+  actor: Actor,
+  input: { disputeId: string; decision: DisputeDecision | "MORE_REVIEW"; refundBps?: number; note: string },
+) {
+  if (actor.role !== "ADMIN") fail("Yalnızca admin uyuşmazlık sonuçlandırabilir.", 403);
+  const note = z.string().trim().min(5, "Karar notu en az 5 karakter olmalı").max(1000).parse(input.note);
+  const res = await mutate((db) => {
+    const d = db.disputes.find((x) => x.id === input.disputeId);
+    if (!d) fail("Uyuşmazlık bulunamadı", 404);
+    const dd = d as Dispute;
+    if (dd.status === "RESOLVED") fail("Uyuşmazlık zaten sonuçlandırılmış.", 409);
+    if (dd.status === "DECIDED") fail("Karar onaylandı; itiraz süresi sonunda uygulanır.", 409);
+    const tx = getTx(db, dd.txId);
+    if (input.decision === "MORE_REVIEW") {
+      if (dd.status === "OPEN") dd.status = "UNDER_REVIEW";
+      dd.reviewNotes.push({ text: note, at: nowIso(), adminId: actor.id });
+      audit(db, actor, "DISPUTE_REVIEW", dd.id, note);
+      return { status: tx.status, stage: "REVIEW" as const };
+    }
+    assertNoHold(tx);
+    const bps = bpsOf(input.decision, input.refundBps);
+    if (dd.status === "APPEAL") {
+      assertDistinctAdmin(db, actor, [dd.proposal?.adminId, dd.approval?.adminId]);
+      finalizeDispute(db, tx, dd, actor, "APPEAL", note, { refundBps: bps });
+      return { status: tx.status, stage: "FINAL" as const };
+    }
+    if (dd.proposal && dd.proposal.adminId !== actor.id) fail("Bekleyen bir karar önerisi var; onaylayın veya iade edin.", 409);
+    dd.proposal = { decision: decisionOf(bps), refundBps: bps, note, adminId: actor.id, at: nowIso() };
+    dd.status = "UNDER_REVIEW";
+    audit(db, actor, "DISPUTE_PROPOSE", dd.id, `${decisionText(bps)} — ${note}`);
+    if (activeAdmins(db).length < 2) {
+      approveInternal(db, dd, actor, "Tek yönetici hesabı: çift onay uygulanamadı.");
+      return { status: tx.status, stage: "DECIDED" as const, bps };
+    }
+    return { status: tx.status, stage: "PROPOSED" as const, bps };
+  });
+  if (res.stage === "DECIDED") await notifyDecision(input.disputeId);
+  if (res.stage === "PROPOSED") await notifyDispute(input.disputeId, "Karar önerisi onay bekliyor", "Bir uyuşmazlık karar önerisi ikinci yönetici onayını bekliyor.", ["ADMIN"]);
+  if (res.stage === "FINAL") await notifyDispute(input.disputeId, "İtiraz sonucu karar verildi", "İtirazınız incelendi ve nihai platform kararı uygulandı.");
+  return res;
+}
+
+async function notifyDecision(disputeId: string) {
+  const db = await getDb();
+  const d = db.disputes.find((x) => x.id === disputeId);
+  if (!d?.proposal || !d.appealUntil) return;
+  const until = new Date(d.appealUntil).toLocaleDateString("tr-TR");
+  await notifyDispute(disputeId, "Uyuşmazlık kararı bildirildi", `Karar: ${decisionText(d.proposal.refundBps)}. ${until} tarihine kadar itiraz edebilirsiniz; itiraz yoksa karar uygulanır.`);
+}
+
+/** İkinci yönetici: öneriyi onaylar (itiraz süresi başlar) ya da gerekçeyle iade eder. */
+export async function approveDispute(actor: Actor, input: { disputeId: string; approve: boolean; note: string }) {
+  if (actor.role !== "ADMIN") fail("Yalnızca admin onaylayabilir.", 403);
+  const note = z.string().trim().min(5, "Not en az 5 karakter olmalı").max(1000).parse(input.note);
+  const res = await mutate((db) => {
+    const d = db.disputes.find((x) => x.id === input.disputeId);
+    if (!d) fail("Uyuşmazlık bulunamadı", 404);
+    const dd = d as Dispute;
+    if (dd.status !== "UNDER_REVIEW" || !dd.proposal) fail("Onay bekleyen bir karar önerisi yok.", 409);
+    const prop = dd.proposal as NonNullable<Dispute["proposal"]>;
+    assertDistinctAdmin(db, actor, [prop.adminId]);
+    if (input.approve) {
+      assertNoHold(getTx(db, dd.txId));
+      approveInternal(db, dd, actor, note);
+    } else {
+      dd.reviewNotes.push({ text: `Karar önerisi iade edildi: ${note}`, at: nowIso(), adminId: actor.id });
+      dd.proposal = undefined;
+      audit(db, actor, "DISPUTE_RETURN", dd.id, note);
+    }
+    return { approved: input.approve };
+  });
+  if (res.approved) await notifyDecision(input.disputeId);
+  return res;
+}
+
+/** Taraflar: karar bildiriminden itibaren 3 gün içinde bir kez itiraz. */
+export async function appealDispute(actor: Actor, input: { disputeId: string; reason: string }) {
+  if (actor.role === "ADMIN") fail("Yalnızca taraflar itiraz edebilir.", 403);
+  const reason = z.string().trim().min(10, "İtiraz gerekçesi en az 10 karakter olmalı").max(1000).parse(input.reason);
+  const res = await mutate((db) => {
+    const dd = db.disputes.find((x) => x.id === input.disputeId);
+    if (!dd) fail("Uyuşmazlık bulunamadı", 404);
+    const d = dd as Dispute;
+    assertAccess(getTx(db, d.txId), actor);
+    if (d.status !== "DECIDED") fail("Şu an itiraz edilebilecek bir karar yok.", 409);
+    if (!d.appealUntil || new Date(d.appealUntil).getTime() < now().getTime()) fail("İtiraz süresi dolmuş.", 409);
+    if (d.appeal) fail("İtiraz hakkı zaten kullanılmış.", 409);
+    const at = nowIso();
+    d.appeal = { by: actor.role, reason, at };
+    d.statements.push({ by: actor.role, userId: actor.id, text: `İtiraz: ${reason}`, at });
+    d.status = "APPEAL";
+    d.appealUntil = undefined;
+    d.decideBy = addBusinessDays(now(), APPEAL_BUSINESS_DAYS).toISOString();
+    audit(db, actor, "DISPUTE_APPEAL", d.id, reason);
+    return { ok: true };
+  });
+  await notifyDispute(input.disputeId, "Karara itiraz edildi", "Karar itiraz nedeniyle yeniden inceleniyor; tutar havuzda bekliyor.");
+  await notifyDispute(input.disputeId, "İtiraz geldi", "Bir uyuşmazlık kararına itiraz edildi; farklı bir yönetici incelemelidir.", ["ADMIN"]);
+  return res;
+}
+
+/* ------------------------------------------------------------------ hukuki blokaj */
+
+/** Mahkeme / icra / savcılık talebi: havuzdaki para hareketi (iade, aktarım, karar uygulaması) durdurulur. */
+export async function placeLegalHold(actor: Actor, input: { txId: string; reason: string; reference: string }) {
+  if (actor.role !== "ADMIN") fail("Yalnızca admin hukuki blokaj uygulayabilir.", 403);
+  const p = z
+    .object({ reason: z.string().trim().min(5, "Gerekçe en az 5 karakter olmalı").max(500), reference: z.string().trim().min(2, "Dosya/yazı numarası gerekli").max(100) })
+    .parse(input);
+  return await mutate((db) => {
+    const tx = getTx(db, input.txId);
+    if (tx.legalHold) fail("Bu işlemde zaten hukuki blokaj var.", 409);
+    if (escrowHeld(db, tx.id) <= 0) fail("Havuzda tutar olmayan işlemde blokaj uygulanamaz.", 409);
+    const at = nowIso();
+    tx.legalHold = { reason: p.reason, reference: p.reference, at, adminId: actor.id };
+    tx.updatedAt = at;
+    tx.events.push({ at, label: `Hukuki blokaj uygulandı (${p.reference}): ${p.reason}`, actorRole: "ADMIN", actorId: actor.id, status: tx.status });
+    audit(db, actor, "LEGAL_HOLD", tx.id, `${p.reference}: ${p.reason}`);
     return { ok: true };
   });
 }
 
-export async function resolveDispute(
-  actor: Actor,
-  input: { disputeId: string; decision: "REFUND_BUYER" | "PAY_SELLER" | "MORE_REVIEW"; note: string },
-) {
-  if (actor.role !== "ADMIN") fail("Yalnızca admin uyuşmazlık sonuçlandırabilir.", 403);
-  const note = z.string().trim().min(5, "Karar notu en az 5 karakter olmalı").max(1000).parse(input.note);
+export async function liftLegalHold(actor: Actor, input: { txId: string; note: string }) {
+  if (actor.role !== "ADMIN") fail("Yalnızca admin blokajı kaldırabilir.", 403);
+  const note = z.string().trim().min(5, "Not en az 5 karakter olmalı").max(500).parse(input.note);
   return await mutate((db) => {
-    const d = db.disputes.find((x) => x.id === input.disputeId);
-    if (!d) fail("Uyuşmazlık bulunamadı", 404);
-    const dd = d as Db["disputes"][number];
-    if (dd.status === "RESOLVED") fail("Uyuşmazlık zaten sonuçlandırılmış.", 409);
-    const tx = getTx(db, dd.txId);
+    const tx = getTx(db, input.txId);
+    if (!tx.legalHold) fail("Bu işlemde hukuki blokaj yok.", 409);
     const at = nowIso();
-    if (input.decision === "MORE_REVIEW") {
-      dd.status = "UNDER_REVIEW";
-      dd.reviewNotes.push({ text: note, at, adminId: actor.id });
-      audit(db, actor, "DISPUTE_REVIEW", dd.id, note);
-      return { status: tx.status };
-    }
-    dd.status = "RESOLVED";
-    dd.resolution = { decision: input.decision, note, at, adminId: actor.id };
-    if (input.decision === "REFUND_BUYER") refundBuyer(db, tx, actor, `Uyuşmazlık kararı: ${note}`, "Admin kararı: müşteriye iade edildi");
-    else releaseToSeller(db, tx, actor, "Admin kararı: tutar satıcıya aktarıldı");
-    audit(db, actor, "DISPUTE_RESOLVE", dd.id, `${input.decision}: ${note}`);
-    return { status: tx.status };
+    const ref = (tx.legalHold as NonNullable<Transaction["legalHold"]>).reference;
+    tx.legalHold = undefined;
+    tx.updatedAt = at;
+    tx.events.push({ at, label: `Hukuki blokaj kaldırıldı (${ref}): ${note}`, actorRole: "ADMIN", actorId: actor.id, status: tx.status });
+    audit(db, actor, "LEGAL_HOLD_LIFT", tx.id, `${ref}: ${note}`);
+    return { ok: true };
   });
 }
 

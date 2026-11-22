@@ -23,6 +23,12 @@ export async function POST(req: Request) {
       case "dispute.open": return ok(await S.openDispute(actor, p));
       case "dispute.statement": return ok(await S.addDisputeStatement(actor, p));
       case "dispute.resolve": return ok(await S.resolveDispute(actor, p));
+      case "dispute.approve": return ok(await S.approveDispute(actor, p));
+      case "dispute.offer": return ok(await S.makeDisputeOffer(actor, p));
+      case "dispute.respondOffer": return ok(await S.respondDisputeOffer(actor, p));
+      case "dispute.appeal": return ok(await S.appealDispute(actor, p));
+      case "tx.legalHold": return ok(await S.placeLegalHold(actor, p));
+      case "tx.liftLegalHold": return ok(await S.liftLegalHold(actor, p));
       case "withdrawal.request": return ok(await S.requestWithdrawal(actor, p));
       case "withdrawal.decide": return ok(await S.decideWithdrawal(actor, p));
       case "user.setActive": return ok(await S.setUserActive(actor, p));

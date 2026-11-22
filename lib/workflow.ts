@@ -63,8 +63,8 @@ export const TRANSITIONS: Record<TxStatus, Partial<Record<TxStatus, ActorRole[]>
     REFUNDED: ["SELLER", "ADMIN", "SYSTEM"],
   },
   DISPUTED: {
-    REFUNDED: ["ADMIN"],
-    COMPLETED: ["ADMIN"],
+    REFUNDED: ["ADMIN", "SYSTEM"],
+    COMPLETED: ["ADMIN", "SYSTEM"],
   },
   COMPLETED: {},
   REFUNDED: {},

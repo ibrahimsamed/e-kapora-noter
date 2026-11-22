@@ -81,6 +81,8 @@ export async function downloadTxPdf(d: TxDetailData) {
     ["Hizmet / teslimat tarihi", formatDate(tx.serviceDate)],
     ["Geçerlilik", formatDate(tx.validUntil)],
     ["İade bilgisi", refund],
+    ...(tx.legalHold ? [["Hukuki blokaj", `${tx.legalHold.reference} — ${tx.legalHold.reason}`]] : []),
+    ...(tx.termsSnapshot ? [["Kabul edilen şartlar", `Sürüm ${tx.termsSnapshot.version} • ${formatDateTime(tx.termsSnapshot.at)}`], ["Şart özeti (SHA-256)", tx.termsSnapshot.hash]] : []),
   ], y);
 
   y += 16;

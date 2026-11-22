@@ -32,7 +32,7 @@ const TABLES: TableSpec[] = [
   { key: "payments", table: "payments", ts: ["at"], insertOnly: true },
   { key: "withdrawals", table: "withdrawals", ts: ["created_at", "decided_at"], insertOnly: false },
   { key: "ledger", table: "ledger", ts: ["at"], insertOnly: true },
-  { key: "disputes", table: "disputes", ts: ["opened_at"], insertOnly: false },
+  { key: "disputes", table: "disputes", ts: ["opened_at", "respond_by", "decide_by", "appeal_until"], insertOnly: false },
   { key: "audit", table: "audit", ts: ["at"], insertOnly: true },
 ];
 

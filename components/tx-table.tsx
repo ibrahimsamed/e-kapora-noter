@@ -60,6 +60,7 @@ export function TxTable({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="font-semibold text-navy">{title ?? "İşlemler"} <span className="text-sm font-normal text-muted">({filtered.length})</span></h3>
           {exportCsv && (
+            // eslint-disable-next-line @next/next/no-html-link-for-pages
             <a href="/api/export" className="inline-flex items-center gap-2 rounded-xl border border-line px-3 py-1.5 text-sm font-semibold hover:bg-surface">
               <Download className="h-4 w-4" /> CSV
             </a>

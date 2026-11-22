@@ -1,9 +1,10 @@
-import { CheckCircle2, Circle, FileText, Scale } from "lucide-react";
+import { CheckCircle2, Circle, FileText, Lock } from "lucide-react";
 import type { TxDetailData } from "@/lib/queries";
 import type { Role } from "@/lib/types";
 import { CATEGORY_LABEL, LEDGER_LABEL, ROLE_LABEL } from "@/lib/workflow";
 import { formatDate, formatDateTime, formatPhone, formatTRY } from "@/lib/format";
 import { Card, CardHeader, KV, Pill, StatusBadge } from "./ui";
+import { DisputePanel } from "./dispute-panel";
 
 function Summary({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
@@ -38,6 +39,12 @@ export function TxDetail({ data, role }: { data: TxDetailData; role: Role }) {
         </div>
       </div>
 
+      {tx.legalHold && (
+        <div role="status" className="flex items-start gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+          <Lock className="mt-0.5 h-4 w-4 shrink-0" />
+          <p><b>Hukuki blokaj:</b> Yetkili makam talebi ({tx.legalHold.reference}) nedeniyle bu işlemdeki para hareketleri durduruldu. Blokaj kalkana kadar iade, aktarım veya karar uygulaması yapılmaz.</p>
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Summary label="Toplam bedel" value={formatTRY(tx.totalAmount)} />
         <Summary label="Kapora" value={formatTRY(tx.deposit)} sub={isAdmin ? `Müşteri toplam ${formatTRY(totalPay)} öder` : `Kapora oranı ${rate}`} />
@@ -141,6 +148,16 @@ export function TxDetail({ data, role }: { data: TxDetailData; role: Role }) {
               <KV k="Satıcı onayı" v={tx.sellerConfirmedAt ? <Pill tone="green">{formatDateTime(tx.sellerConfirmedAt)}</Pill> : <Pill tone="amber">Bekleniyor</Pill>} />
             </dl>
           </Card>
+          {tx.termsSnapshot && (
+            <Card>
+              <CardHeader title="Kabul edilen şartlar" subtitle="Ödeme anında değiştirilemez şekilde kaydedildi." />
+              <dl className="divide-y divide-line px-5 py-2">
+                <KV k="Sürüm" v={tx.termsSnapshot.version} />
+                <KV k="Kayıt zamanı" v={formatDateTime(tx.termsSnapshot.at)} />
+                <KV k="SHA-256" v={<span className="break-all font-mono text-[10px]">{tx.termsSnapshot.hash}</span>} />
+              </dl>
+            </Card>
+          )}
           <Card>
             <CardHeader title="Belgeler" />
             <ul className="divide-y divide-line px-5 py-1">
@@ -149,17 +166,7 @@ export function TxDetail({ data, role }: { data: TxDetailData; role: Role }) {
               ))}
             </ul>
           </Card>
-          {dispute && (
-            <Card className="border-red-200">
-              <CardHeader title="Uyuşmazlık" action={<Pill tone={dispute.status === "RESOLVED" ? "green" : "red"}>{dispute.status === "RESOLVED" ? "Sonuçlandı" : dispute.status === "UNDER_REVIEW" ? "İncelemede" : "Açık"}</Pill>} />
-              <div className="space-y-3 p-5 text-sm">
-                {dispute.statements.map((s, i) => (
-                  <div key={i} className="rounded-xl bg-surface p-3"><p className="text-xs text-muted"><Scale className="mr-1 inline h-3 w-3" />{ROLE_LABEL[s.by]} • {formatDateTime(s.at)}</p><p className="mt-1">{s.text}</p></div>
-                ))}
-                {dispute.resolution && <p className="rounded-xl bg-success-soft p-3 text-success"><b>Karar:</b> {dispute.resolution.decision === "REFUND_BUYER" ? "Müşteriye iade" : "Satıcıya aktarım"} — {dispute.resolution.note}</p>}
-              </div>
-            </Card>
-          )}
+          {dispute && <DisputePanel dispute={dispute} txId={tx.id} role={role} />}
         </div>
       </div>
     </div>

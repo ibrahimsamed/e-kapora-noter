@@ -1,17 +1,17 @@
 "use client";
 import { useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { Check, CheckCircle2, Copy, CreditCard, FileText, MessageCircle, RotateCcw, Scale, XCircle, Send, Link2, Gavel } from "lucide-react";
+import { Check, CheckCircle2, Copy, CreditCard, FileText, MessageCircle, RotateCcw, Scale, XCircle, Send, Link2, Gavel, Lock, Unlock } from "lucide-react";
 import type { TxDetailData } from "@/lib/queries";
 import type { Role } from "@/lib/types";
 import { formatTRY } from "@/lib/format";
-import { BANK_INFO, DEMO_CARD_HINTS } from "@/lib/constants";
+import { BANK_INFO } from "@/lib/constants";
 import { Button, Card, CardHeader, Field, Input, Modal, Textarea } from "./ui";
 import { useAction } from "./use-action";
 import { useToast } from "./toast";
 import { TermsLink } from "./terms";
 
-type Mode = null | "pay" | "cancel" | "dispute" | "statement" | "cancelUnpaid" | "refundStart";
+type Mode = null | "pay" | "cancel" | "dispute" | "statement" | "cancelUnpaid" | "refundStart" | "hold" | "unhold";
 
 export function PdfButton({ id, label = "PDF indir" }: { id: string; label?: string }) {
   const toast = useToast();
@@ -60,24 +60,82 @@ export function SharePanel({ txId, customerName, title }: { txId: string; custom
   );
 }
 
-function ReasonModal({ open, onClose, title, label, cta, danger, onSubmit, withEvidence, busy }: {
-  open: boolean; onClose: () => void; title: string; label: string; cta: string; danger?: boolean; withEvidence?: boolean; busy: boolean;
-  onSubmit: (text: string, evidence: string) => void;
+export interface UploadedEvidence { name: string; path: string; sha256: string; sizeKb: number; mime: string }
+
+async function uploadEvidence(txId: string, file: File): Promise<{ ok: true; data: UploadedEvidence } | { ok: false; error: string }> {
+  const fd = new FormData();
+  fd.set("txId", txId);
+  fd.set("file", file);
+  try {
+    const res = await fetch("/api/upload", { method: "POST", body: fd });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) return { ok: false, error: json.error ?? "Dosya yüklenemedi." };
+    return { ok: true, data: json.data };
+  } catch {
+    return { ok: false, error: "Sunucuya ulaşılamadı." };
+  }
+}
+
+function ReasonModal({ open, onClose, title, label, cta, danger, onSubmit, withEvidence, busy, txId }: {
+  open: boolean; onClose: () => void; title: string; label: string; cta: string; danger?: boolean; withEvidence?: boolean; busy: boolean; txId: string;
+  onSubmit: (text: string, evidence?: UploadedEvidence) => void;
 }) {
   const [text, setText] = useState("");
-  const [ev, setEv] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [up, setUp] = useState(false);
+  const [err, setErr] = useState("");
+  const toast = useToast();
+  async function go() {
+    setErr("");
+    let ev: UploadedEvidence | undefined;
+    if (file) {
+      setUp(true);
+      const r = await uploadEvidence(txId, file);
+      setUp(false);
+      if (!r.ok) { setErr(r.error); toast("err", r.error); return; }
+      ev = r.data;
+    }
+    onSubmit(text, ev);
+  }
   return (
     <Modal open={open} onClose={onClose} title={title}>
       <div className="space-y-4">
-        <Field label={label}><Textarea value={text} onChange={(e) => setText(e.target.value)} maxLength={500} /></Field>
+        <Field label={label}><Textarea value={text} onChange={(e) => setText(e.target.value)} maxLength={withEvidence ? 1000 : 500} /></Field>
         {withEvidence && (
-          <Field label="Kanıt dosyası (opsiyonel)" hint="Dosya yüklenmez; yalnızca dosya adı kayda eklenir.">
-            <Input type="file" onChange={(e) => setEv(e.target.files?.[0]?.name ?? "")} />
+          <Field label="Kanıt dosyası (opsiyonel)" hint="PDF, JPG, PNG, WEBP, MP4, TXT veya DOC(X); en fazla 8 MB. Dosya özel depoda saklanır ve SHA-256 özeti kayda alınır." error={err}>
+            <Input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.mp4,.txt,.doc,.docx" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
           </Field>
         )}
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={onClose}>Vazgeç</Button>
-          <Button variant={danger ? "danger" : "primary"} disabled={busy || text.trim().length < 5} onClick={() => onSubmit(text, ev)}>{cta}</Button>
+          <Button variant={danger ? "danger" : "primary"} disabled={busy || up || text.trim().length < 5} onClick={go}>{up ? "Yükleniyor…" : cta}</Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function HoldModal({ open, onClose, busy, txId, lift }: { open: boolean; onClose: () => void; busy: boolean; txId: string; lift: boolean }) {
+  const { run } = useAction();
+  const [ref, setRef] = useState("");
+  const [text, setText] = useState("");
+  return (
+    <Modal open={open} onClose={onClose} title={lift ? "Hukuki blokajı kaldır" : "Hukuki blokaj uygula"}>
+      <div className="space-y-4">
+        {!lift && (
+          <>
+            <p className="text-sm text-muted">Mahkeme, icra veya savcılık talebi nedeniyle havuzdaki tutar dondurulur; iade, aktarım ve uyuşmazlık kararı uygulanamaz.</p>
+            <Field label="Dosya / yazı numarası"><Input value={ref} onChange={(e) => setRef(e.target.value)} maxLength={100} /></Field>
+          </>
+        )}
+        <Field label={lift ? "Kaldırma gerekçesi" : "Gerekçe"}><Textarea value={text} onChange={(e) => setText(e.target.value)} maxLength={500} /></Field>
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" onClick={onClose}>Vazgeç</Button>
+          <Button variant="danger" disabled={busy || text.trim().length < 5 || (!lift && ref.trim().length < 2)}
+            onClick={async () => {
+              const r = lift ? await run("tx.liftLegalHold", { txId, note: text }, "Blokaj kaldırıldı.") : await run("tx.legalHold", { txId, reference: ref, reason: text }, "Hukuki blokaj uygulandı.");
+              if (r.ok) { onClose(); setRef(""); setText(""); }
+            }}>{lift ? "Blokajı kaldır" : "Blokaj uygula"}</Button>
         </div>
       </div>
     </Modal>
@@ -159,12 +217,6 @@ function PayModal({ open, onClose, data }: { open: boolean; onClose: () => void;
         </div>
       ) : (
         <form onSubmit={submit} className="space-y-4">
-          <div className="flex flex-wrap gap-2">
-            {DEMO_CARD_HINTS.map((c) => (
-              <button type="button" key={c.number} onClick={() => setF({ number: fmtNum(c.number), name: "MUSTERI", exp: "12/30", cvc: "123" })}
-                className="rounded-full border border-line px-3 py-1 text-xs font-medium hover:bg-surface">{c.label}</button>
-            ))}
-          </div>
           <Field label="Kart numarası"><Input inputMode="numeric" autoComplete="off" placeholder="4242 4242 4242 4242" value={f.number} onChange={(e) => setF({ ...f, number: fmtNum(e.target.value) })} required /></Field>
           <Field label="Kart üzerindeki isim"><Input autoComplete="off" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} required /></Field>
           <div className="grid grid-cols-2 gap-3">
@@ -173,7 +225,7 @@ function PayModal({ open, onClose, data }: { open: boolean; onClose: () => void;
           </div>
           <div className="rounded-xl bg-surface p-3 text-sm">
             <div className="flex justify-between"><span className="text-muted">Kapora</span><span>{formatTRY(tx.deposit)}</span></div>
-            <div className="flex justify-between"><span className="text-muted">Sistem ücreti</span><span>{formatTRY(tx.buyerFee)}</span></div>
+            {tx.buyerFee > 0 && <div className="flex justify-between"><span className="text-muted">Sistem ücreti</span><span>{formatTRY(tx.buyerFee)}</span></div>}
             <div className="mt-1 flex justify-between border-t border-line pt-1 font-bold text-navy"><span>Toplam</span><span>{formatTRY(total)}</span></div>
           </div>
           <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-line p-3 text-sm">
@@ -244,11 +296,18 @@ export function TxActions({ data, role }: { data: TxDetailData; role: Role }) {
     buttons.push(<Link key="al" href={`/admin/uyusmazliklar/${dispute.id}`} className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark"><Scale className="h-4 w-4" /> Uyuşmazlığı incele</Link>);
   }
 
+  if (role === "ADMIN" && !tx.legalHold && data.held > 0) {
+    buttons.push(<Button key="lh" variant="outline" onClick={() => setMode("hold")}><Lock className="h-4 w-4" /> Hukuki blokaj uygula</Button>);
+  }
+  if (role === "ADMIN" && tx.legalHold) {
+    buttons.push(<Button key="ulh" variant="outline" onClick={() => setMode("unhold")}><Unlock className="h-4 w-4" /> Blokajı kaldır</Button>);
+  }
+
   const hint =
     s === "CANCELLATION_REQUESTED" ? (role === "CUSTOMER" ? "İptal talebiniz satıcının yanıtını bekliyor." : "Müşteri iptal/iade talebi oluşturdu. Gerekçe: " + (tx.cancelRequest?.reason ?? "—")) :
     s === "WAITING_FOR_CONFIRMATION" ? (myConfirm ? "Onayınız alındı; karşı tarafın onayı bekleniyor." : "Karşı taraf onayladı; sizin onayınız bekleniyor.") :
     s === "PAYMENT_PROCESSING" ? (role === "ADMIN" ? "Müşteri havale yaptığını bildirdi. Tutar hesaba ulaştıysa onaylayın." : "Havale bildirimi alındı; tutar kontrol edildikten sonra işlem güvence altına alınacak.") :
-    s === "DISPUTED" ? "Uyuşmazlık admin incelemesinde. Otomatik sonuçlandırma yapılmaz." :
+    s === "DISPUTED" ? "Uyuşmazlık sürecinde: karşılıklı teklif verebilir, kanıt ekleyebilirsiniz. Platform kararı çift onayla verilir ve itiraz süresi sonunda uygulanır." :
     s === "REFUND_PROCESSING" ? "İade süreci başlatıldı." : null;
 
   return (
@@ -265,16 +324,18 @@ export function TxActions({ data, role }: { data: TxDetailData; role: Role }) {
       </Card>
 
       {mode === "pay" && <PayModal open onClose={close} data={data} />}
-      <ReasonModal open={mode === "cancel"} onClose={close} busy={busy} title="İptal / iade talebi" label="İptal gerekçeniz" cta="Talebi gönder"
+      <ReasonModal txId={tx.id} open={mode === "cancel"} onClose={close} busy={busy} title="İptal / iade talebi" label="İptal gerekçeniz" cta="Talebi gönder"
         onSubmit={async (t) => { const r = await run("tx.requestCancel", { txId: tx.id, reason: t }, "Talebiniz satıcıya iletildi."); if (r.ok) close(); }} />
-      <ReasonModal open={mode === "refundStart"} onClose={close} busy={busy} danger title="İptal ve iade başlat" label="Gerekçe (müşteriye iade edilecek)" cta="İade sürecini başlat"
+      <ReasonModal txId={tx.id} open={mode === "refundStart"} onClose={close} busy={busy} danger title="İptal ve iade başlat" label="Gerekçe (müşteriye iade edilecek)" cta="İade sürecini başlat"
         onSubmit={async (t) => { const r = await run("tx.requestCancel", { txId: tx.id, reason: t }, "İade süreci başlatıldı."); if (r.ok) close(); }} />
-      <ReasonModal open={mode === "dispute"} onClose={close} busy={busy} danger withEvidence title="Uyuşmazlık bildir" label="Uyuşmazlık gerekçesi (en az 10 karakter)" cta="Uyuşmazlık aç"
-        onSubmit={async (t, ev) => { const r = await run("dispute.open", { txId: tx.id, reason: t, evidenceName: ev }, "Uyuşmazlık kaydı açıldı; admin incelemesi bekleniyor."); if (r.ok) close(); }} />
+      <ReasonModal txId={tx.id} open={mode === "dispute"} onClose={close} busy={busy} danger withEvidence title="Uyuşmazlık bildir" label="Uyuşmazlık gerekçesi (en az 10 karakter)" cta="Uyuşmazlık aç"
+        onSubmit={async (t, ev) => { const r = await run("dispute.open", { txId: tx.id, reason: t, evidence: ev }, "Uyuşmazlık kaydı açıldı; admin incelemesi bekleniyor."); if (r.ok) close(); }} />
       {dispute && (
-        <ReasonModal open={mode === "statement"} onClose={close} busy={busy} withEvidence title="Açıklama / kanıt ekle" label="Açıklamanız" cta="Ekle"
-          onSubmit={async (t, ev) => { const r = await run("dispute.statement", { disputeId: dispute.id, text: t, evidenceName: ev }, "Açıklamanız eklendi."); if (r.ok) close(); }} />
+        <ReasonModal txId={tx.id} open={mode === "statement"} onClose={close} busy={busy} withEvidence title="Açıklama / kanıt ekle" label="Açıklamanız" cta="Ekle"
+          onSubmit={async (t, ev) => { const r = await run("dispute.statement", { disputeId: dispute.id, text: t, evidence: ev }, "Açıklamanız eklendi."); if (r.ok) close(); }} />
       )}
+      <HoldModal open={mode === "hold"} onClose={close} busy={busy} txId={tx.id} lift={false} />
+      <HoldModal open={mode === "unhold"} onClose={close} busy={busy} txId={tx.id} lift />
       <Modal open={mode === "cancelUnpaid"} onClose={close} title="İşlemi iptal et">
         <p className="mb-4 text-sm text-muted">Ödeme alınmadığı için herhangi bir iade gerekmez. İşlem iptal edilecek.</p>
         <div className="flex justify-end gap-2">
